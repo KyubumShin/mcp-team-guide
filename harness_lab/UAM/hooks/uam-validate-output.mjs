@@ -126,15 +126,44 @@ async function main() {
 
   // Get expected sections for this agent
   const sections = EXPECTED_SECTIONS[agentType] || [];
-  const sectionList = sections.map(s => `  - ${s}`).join('\n');
 
-  const message = `[UAM VALIDATION] Agent "${agentType}" output requires schema validation.
+  // Actually validate tool_response content against expected sections
+  const toolResponse = data.tool_response || data.toolResponse || '';
+  const responseText = typeof toolResponse === 'string'
+    ? toolResponse
+    : JSON.stringify(toolResponse);
 
-Verify the output contains ALL required sections:
+  const missingSections = [];
+  const foundSections = [];
+  for (const section of sections) {
+    // Case-insensitive search for section name in response
+    if (responseText.toLowerCase().includes(section.toLowerCase())) {
+      foundSections.push(section);
+    } else {
+      missingSections.push(section);
+    }
+  }
+
+  const validationPassed = missingSections.length === 0;
+  const sectionList = sections.map(s => {
+    const found = foundSections.includes(s);
+    return `  - ${found ? '[PASS]' : '[MISSING]'} ${s}`;
+  }).join('\n');
+
+  let message;
+  if (validationPassed) {
+    message = `[UAM VALIDATION PASSED] Agent "${agentType}" output contains all ${sections.length} required sections.`;
+  } else {
+    message = `[UAM VALIDATION FAILED] Agent "${agentType}" output is missing ${missingSections.length}/${sections.length} required sections.
+
+Validation results:
 ${sectionList}
 
-If any section is missing or malformed, re-run the agent with clarified instructions.
-Do NOT proceed to the next phase until validation passes.`;
+Missing sections: ${missingSections.join(', ')}
+
+ACTION REQUIRED: Re-run the agent with clarified instructions targeting the missing sections.
+Do NOT proceed to the next phase until all sections are present.`;
+  }
 
   console.log(JSON.stringify({
     continue: true,
