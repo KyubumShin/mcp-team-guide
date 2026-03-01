@@ -5,8 +5,10 @@
  * Based on design document section 12.2
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from 'fs';
 import { join } from 'path';
+import { randomBytes } from 'crypto';
+import { loadConfig } from './uam-config.mjs';
 
 const STATE_DIR = '.uam';
 const STATE_FILE = 'state.json';
@@ -59,23 +61,30 @@ const DEFAULT_STATE = {
   }
 };
 
+// Prototype pollution guard keys
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 /**
  * Read UAM state from .uam/state.json
  * @param {string} cwd - Working directory
- * @returns {object|null} State object or null if not found
+ * @returns {object|null} State object or null if not found/invalid
  */
 export function readState(cwd) {
   try {
     const statePath = join(cwd, STATE_DIR, STATE_FILE);
     if (!existsSync(statePath)) return null;
-    return JSON.parse(readFileSync(statePath, 'utf-8'));
+    const parsed = JSON.parse(readFileSync(statePath, 'utf-8'));
+    // M5: Minimal schema validation
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    if (!parsed.current_phase) return null;
+    return parsed;
   } catch {
     return null;
   }
 }
 
 /**
- * Write/merge UAM state to .uam/state.json
+ * Write/merge UAM state to .uam/state.json (atomic via temp + rename)
  * @param {string} cwd - Working directory
  * @param {object} patch - Fields to merge into state
  * @returns {object} Merged state
@@ -89,11 +98,10 @@ export function writeState(cwd, patch) {
   const current = readState(cwd) || { ...DEFAULT_STATE };
   const merged = deepMerge(current, patch);
 
-  writeFileSync(
-    join(stateDir, STATE_FILE),
-    JSON.stringify(merged, null, 2),
-    { mode: 0o600 }
-  );
+  // C2: Atomic write via temp file + rename
+  const tmpPath = join(stateDir, `.state-${randomBytes(4).toString('hex')}.tmp`);
+  writeFileSync(tmpPath, JSON.stringify(merged, null, 2), { mode: 0o600 });
+  renameSync(tmpPath, join(stateDir, STATE_FILE));
 
   return merged;
 }
@@ -104,8 +112,12 @@ export function writeState(cwd, patch) {
  * @returns {boolean}
  */
 export function isUamActive(cwd) {
+  // M6: Check file existence separately from readState
+  const statePath = join(cwd, STATE_DIR, STATE_FILE);
+  if (!existsSync(statePath)) return false; // No file = truly inactive
+
   const state = readState(cwd);
-  if (!state) return false;
+  if (!state) return true; // File exists but corrupt/invalid = fail-closed (assume active)
   if (!state.current_phase) return false;
   // Active if phase is not null and not finalized
   return state.current_phase !== 'completed' && state.current_phase !== 'cancelled';
@@ -119,21 +131,41 @@ export function isUamActive(cwd) {
  * @returns {object} Initial state
  */
 export function initState(cwd, featureName, runMode = 'full') {
+  // H5: Load config overrides
+  let config = {};
+  try {
+    config = loadConfig(cwd);
+  } catch {
+    // Config load failed, use defaults
+  }
+
   const now = new Date().toISOString();
   const dateStr = now.slice(0, 10).replace(/-/g, '');
-  const slug = featureName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+  // M1: Support Korean/CJK characters in slug
+  const slug = featureName.toLowerCase()
+    .replace(/[^a-z0-9가-힣ぁ-ゔァ-ヴ\u4e00-\u9fff]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40);
 
   const isSmall = runMode === 'small';
+
+  const maxFixLoops = config.max_fix_loops ?? (isSmall ? 3 : 10);
+  const maxTokens = config.max_total_tokens ?? (isSmall ? 150000 : 500000);
+  const convergenceConfig = config.convergence ?? {};
 
   return writeState(cwd, {
     ...DEFAULT_STATE,
     pipeline_id: `uam-${isSmall ? 'small-' : ''}${dateStr}-${slug}`,
     run_mode: runMode,
     current_phase: isSmall ? 'small-plan' : 'phase1a-research',
-    max_fix_loops: isSmall ? 3 : 10,
+    max_fix_loops: maxFixLoops,
     cost: {
       ...DEFAULT_STATE.cost,
-      max_total_tokens: isSmall ? 150000 : 500000
+      max_total_tokens: maxTokens
+    },
+    convergence: {
+      ...DEFAULT_STATE.convergence,
+      ...convergenceConfig
     },
     research: {
       ...DEFAULT_STATE.research,
@@ -144,11 +176,35 @@ export function initState(cwd, featureName, runMode = 'full') {
 }
 
 /**
- * Deep merge two objects (shallow for arrays)
+ * Check convergence of fix loop pass rates
+ * @param {object} state - Current UAM state
+ * @returns {{ status: string, delta?: number }}
  */
-function deepMerge(target, source) {
+export function checkConvergence(state) {
+  const conv = state?.convergence;
+  if (!conv) return { status: 'insufficient_data' };
+
+  const { pass_rate_history, stagnation_window = 3, min_improvement = 0.05, regression_threshold = -0.1 } = conv;
+  if (!Array.isArray(pass_rate_history) || pass_rate_history.length < 2) return { status: 'insufficient_data' };
+
+  const windowSize = Math.min(stagnation_window, pass_rate_history.length);
+  const recent = pass_rate_history.slice(-windowSize);
+  const improvement = recent[recent.length - 1] - recent[0];
+
+  if (improvement < regression_threshold) return { status: 'regression', delta: improvement };
+  if (recent.length >= stagnation_window && improvement < min_improvement) return { status: 'stagnant', delta: improvement };
+  return { status: 'improving', delta: improvement };
+}
+
+/**
+ * Deep merge two objects (shallow for arrays, with prototype pollution guard)
+ */
+export function deepMerge(target, source) {
   const result = { ...target };
   for (const key of Object.keys(source)) {
+    // Prototype pollution guard
+    if (DANGEROUS_KEYS.has(key)) continue;
+
     if (
       source[key] &&
       typeof source[key] === 'object' &&

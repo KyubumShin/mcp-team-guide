@@ -25,21 +25,7 @@ const { initState, isUamActive } = await import(
 // Import shared stdin reader
 const { readStdin } = await import(
   pathToFileURL(join(__dirname, 'lib', 'stdin.mjs')).href
-).catch(() => {
-  return {
-    readStdin: () => new Promise((resolve) => {
-      const chunks = [];
-      let settled = false;
-      const timeout = setTimeout(() => {
-        if (!settled) { settled = true; process.stdin.removeAllListeners(); process.stdin.destroy(); resolve(Buffer.concat(chunks).toString('utf-8')); }
-      }, 5000);
-      process.stdin.on('data', (chunk) => chunks.push(chunk));
-      process.stdin.on('end', () => { if (!settled) { settled = true; clearTimeout(timeout); resolve(Buffer.concat(chunks).toString('utf-8')); } });
-      process.stdin.on('error', () => { if (!settled) { settled = true; clearTimeout(timeout); resolve(''); } });
-      if (process.stdin.readableEnded) { if (!settled) { settled = true; clearTimeout(timeout); resolve(Buffer.concat(chunks).toString('utf-8')); } }
-    })
-  };
-});
+);
 
 /**
  * Extract prompt text from hook input JSON
@@ -86,7 +72,9 @@ function extractFeatureName(prompt) {
     .filter(w => w.length > 2 && !/^(the|and|for|with|this|that|from|into)$/i.test(w))
     .slice(0, 4);
 
-  return words.join('-').toLowerCase().replace(/[^a-z0-9-]/g, '') || 'task';
+  return words.join('-').toLowerCase()
+    .replace(/[^a-z0-9가-힣ぁ-ゔァ-ヴ\u4e00-\u9fff-]/g, '')
+    .replace(/^[-]+|[-]+$/g, '') || 'task';
 }
 
 async function main() {
@@ -228,3 +216,5 @@ IMPORTANT: Load the UAM orchestration protocol via /uam:${commandName} command, 
 }
 
 main();
+
+export { extractPrompt, sanitize, extractFeatureName };

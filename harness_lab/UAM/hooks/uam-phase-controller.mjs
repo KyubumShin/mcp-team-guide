@@ -22,28 +22,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Import shared UAM state utility
-const { readState, writeState, isUamActive } = await import(
+const { readState, writeState, isUamActive, checkConvergence } = await import(
   pathToFileURL(join(__dirname, 'lib', 'uam-state.mjs')).href
 );
 
 // Import shared stdin reader
 const { readStdin } = await import(
   pathToFileURL(join(__dirname, 'lib', 'stdin.mjs')).href
-).catch(() => {
-  return {
-    readStdin: () => new Promise((resolve) => {
-      const chunks = [];
-      let settled = false;
-      const timeout = setTimeout(() => {
-        if (!settled) { settled = true; process.stdin.removeAllListeners(); process.stdin.destroy(); resolve(Buffer.concat(chunks).toString('utf-8')); }
-      }, 5000);
-      process.stdin.on('data', (chunk) => chunks.push(chunk));
-      process.stdin.on('end', () => { if (!settled) { settled = true; clearTimeout(timeout); resolve(Buffer.concat(chunks).toString('utf-8')); } });
-      process.stdin.on('error', () => { if (!settled) { settled = true; clearTimeout(timeout); resolve(''); } });
-      if (process.stdin.readableEnded) { if (!settled) { settled = true; clearTimeout(timeout); resolve(Buffer.concat(chunks).toString('utf-8')); } }
-    })
-  };
-});
+);
 
 /**
  * Check PLAN.md checkbox completion status
@@ -295,14 +281,27 @@ async function main() {
           }
         }));
       } else {
-        // Continue fix loop
-        console.log(JSON.stringify({
-          continue: true,
-          hookSpecificOutput: {
-            hookEventName: 'Stop',
-            additionalContext: `[UAM] Phase 4: Fix Loop ${fixCount}/${maxFix}. Continue fixing or re-run Quality Gate.`
-          }
-        }));
+        // H1: Check convergence before continuing
+        const convergenceResult = checkConvergence(state);
+        if (convergenceResult.status === 'stagnant' || convergenceResult.status === 'regression') {
+          writeState(cwd, { current_phase: 'phase5-finalize' });
+          console.log(JSON.stringify({
+            continue: true,
+            hookSpecificOutput: {
+              hookEventName: 'Stop',
+              additionalContext: `[UAM] Convergence ${convergenceResult.status} detected (delta: ${convergenceResult.delta?.toFixed(3)}). Fix loop is not improving. Transitioning to Phase 5: Finalize (partial completion).`
+            }
+          }));
+        } else {
+          // Continue fix loop
+          console.log(JSON.stringify({
+            continue: true,
+            hookSpecificOutput: {
+              hookEventName: 'Stop',
+              additionalContext: `[UAM] Phase 4: Fix Loop ${fixCount}/${maxFix}. Continue fixing or re-run Quality Gate.`
+            }
+          }));
+        }
       }
       break;
     }
@@ -448,3 +447,5 @@ async function main() {
 main().catch(() => {
   console.log(JSON.stringify({ continue: true, suppressOutput: true }));
 });
+
+export { checkPlanStatus, checkGateResults };

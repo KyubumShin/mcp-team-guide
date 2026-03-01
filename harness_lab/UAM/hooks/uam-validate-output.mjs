@@ -18,28 +18,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Import shared UAM state utility
-const { isUamActive } = await import(
+const { isUamActive, readState, writeState } = await import(
   pathToFileURL(join(__dirname, 'lib', 'uam-state.mjs')).href
 );
 
 // Import shared stdin reader
 const { readStdin } = await import(
   pathToFileURL(join(__dirname, 'lib', 'stdin.mjs')).href
-).catch(() => {
-  return {
-    readStdin: () => new Promise((resolve) => {
-      const chunks = [];
-      let settled = false;
-      const timeout = setTimeout(() => {
-        if (!settled) { settled = true; process.stdin.removeAllListeners(); process.stdin.destroy(); resolve(Buffer.concat(chunks).toString('utf-8')); }
-      }, 5000);
-      process.stdin.on('data', (chunk) => chunks.push(chunk));
-      process.stdin.on('end', () => { if (!settled) { settled = true; clearTimeout(timeout); resolve(Buffer.concat(chunks).toString('utf-8')); } });
-      process.stdin.on('error', () => { if (!settled) { settled = true; clearTimeout(timeout); resolve(''); } });
-      if (process.stdin.readableEnded) { if (!settled) { settled = true; clearTimeout(timeout); resolve(Buffer.concat(chunks).toString('utf-8')); } }
-    })
-  };
-});
+);
 
 // Agents that require output validation
 const VALIDATE_AGENTS = new Set([
@@ -150,11 +136,26 @@ async function main() {
     return `  - ${found ? '[PASS]' : '[MISSING]'} ${s}`;
   }).join('\n');
 
+  // H2: Estimate token usage from response length and update state
+  try {
+    const estimatedTokens = Math.ceil(responseText.length / 4);
+    if (estimatedTokens > 0) {
+      const currentState = readState(cwd);
+      if (currentState) {
+        const currentTokens = currentState.cost?.total_tokens || 0;
+        writeState(cwd, { cost: { total_tokens: currentTokens + estimatedTokens } });
+      }
+    }
+  } catch {
+    // Token tracking is best-effort; do not block on failure
+  }
+
   let message;
   if (validationPassed) {
     message = `[UAM VALIDATION PASSED] Agent "${agentType}" output contains all ${sections.length} required sections.`;
   } else {
-    message = `[UAM VALIDATION FAILED] Agent "${agentType}" output is missing ${missingSections.length}/${sections.length} required sections.
+    // C3: Prefix with [VALIDATION FAILED] for unmistakable signal
+    message = `[VALIDATION FAILED] [UAM VALIDATION FAILED] Agent "${agentType}" output is missing ${missingSections.length}/${sections.length} required sections.
 
 Validation results:
 ${sectionList}
@@ -165,8 +166,9 @@ ACTION REQUIRED: Re-run the agent with clarified instructions targeting the miss
 Do NOT proceed to the next phase until all sections are present.`;
   }
 
+  // C3: Block (continue: false) when validation fails
   console.log(JSON.stringify({
-    continue: true,
+    continue: validationPassed,
     hookSpecificOutput: {
       hookEventName: 'PostToolUse',
       additionalContext: message

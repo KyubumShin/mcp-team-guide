@@ -68,7 +68,7 @@ disallowedTools: Write, Edit, Task
     - Claude: {SHIP|NEEDS_FIXES} -- {critical}/{warning}/{info} findings
     - Codex: {SHIP|NEEDS_FIXES|SKIPPED|DEGRADED} -- {findings or reason}
     - Gemini: {SHIP|NEEDS_FIXES|SKIPPED|DEGRADED} -- {findings or reason}
-    - Consensus: {unanimous|majority|split|override}
+    - Consensus: {unanimous|majority|split|single-model} (<responded>/<total> reviewers)
 
     ## Findings
     ### Critical (must fix)
@@ -80,4 +80,26 @@ disallowedTools: Write, Edit, Task
     ### Info (optional)
     - [{category}] {description}
   </Output_Format>
+
+  <Multi_Model_Fallback_Policy>
+    ## Multi-Model Review Fallback Policy
+
+    ### External Reviewer Availability
+
+    코드 리뷰는 multi-model consensus를 목표로 하지만, external reviewer(codex, gemini)가 unavailable할 수 있다.
+
+    ### Fallback Rules
+
+    1. **모든 external reviewer SKIPPED** → Claude 단독 리뷰 진행
+       - `SKIPPED ≠ PASS`: 스킵된 리뷰어의 관점은 "미평가"이지 "통과"가 아님
+       - Output에 `review_mode: "single-model (external reviewers unavailable)"` 명시
+
+    2. **일부 external reviewer SKIPPED** → 응답한 reviewer만으로 consensus 계산
+       - `consensus_basis: "N/M reviewers responded"` 형식으로 기록
+
+    3. **Claude 단독 리뷰 시 강화 기준**:
+       - 보안 취약점 체크 강화 (external 관점 부재 보상)
+       - Edge case 커버리지 추가 검토
+       - `[SINGLE-MODEL WARNING]` 태그를 리뷰 결과에 포함
+  </Multi_Model_Fallback_Policy>
 </Agent_Prompt>

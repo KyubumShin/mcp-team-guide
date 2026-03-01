@@ -359,6 +359,21 @@ Options:
 Timeout: 30 seconds → Auto-select option 1
 ```
 
+### HITL (Human-in-the-Loop) Timeout Protocol
+
+Pivot Points 평가 등 사용자 입력이 필요한 단계에서:
+
+1. `AskUserQuestion` 도구로 질문 제시
+2. **30초 내 응답 없으면** 기본값으로 자동 진행:
+   - Pivot Point 충돌 판정 → PROVISIONAL PP는 "허용" (진행 우선)
+   - Discovery 승인 → "보류" (안전한 기본값)
+   - 스코프 질문 → 최소 스코프 (MVP 원칙)
+3. 타임아웃 발생 시 로그에 `[HITL-TIMEOUT]` 기록
+4. 사용자가 나중에 재검토할 수 있도록 결정 사항을 `decisions.md`에 기록
+
+> 실제 timeout 구현은 오케스트레이터 레벨의 prompt instruction이다.
+> Hook이나 시스템 타이머가 아닌, 오케스트레이터가 "30초 대기 후 기본값 진행" 프로토콜을 따른다.
+
 ---
 
 ## Phase 2: MVP Sprint
@@ -439,6 +454,21 @@ Run ALL A-items from PLAN.md Test Strategy section:
 # Stop at first tier failure
 ```
 
+### Gate 1 Test Execution Strategy
+
+테스트 실행은 다음 우선순위로 시도한다:
+
+1. **Docker 사용 가능** → Docker 컨테이너 내 pytest/test runner 실행 (격리 보장)
+2. **Docker 미설치/미실행** → Native test runner 자동 감지:
+   - `package.json` 존재 → `npm test`
+   - `pytest.ini` / `pyproject.toml` [tool.pytest] → `pytest`
+   - `Cargo.toml` → `cargo test`
+   - `go.mod` → `go test ./...`
+3. **Test runner 미발견** → Gate 1 = **SKIPPED** (PASS가 아님)
+   - SKIPPED 상태는 Gate 2 (code review)에서 테스트 커버리지 부족을 별도 플래그
+
+> ⚠️ SKIPPED ≠ PASS. Gate 1이 SKIPPED이면 Gate 2 리뷰어에게 "테스트 미실행" 컨텍스트를 전달한다.
+
 **Judge Logic** (orchestrator-internal, not an agent):
 - Parse test output: extract pass/fail counts
 - 100% A-items pass → Gate 1 PASS
@@ -472,6 +502,26 @@ If PLAN.md has S-items:
 - Each scenario 3-5 times, 80%+ pass required
 
 If no S-items: auto-PASS Gate 3.
+
+### Gate 3: Agent-as-User Evaluation Protocol
+
+Gate 3는 S-items (Subjective/UX 항목)이 verification plan에 존재할 때만 실행한다.
+
+**실행 조건:** `verification_plan.items`에 `category: "S"` 항목이 1개 이상
+
+**평가자:** `uam-designer` agent를 "사용자 관점 평가자"로 활용
+
+**체크리스트:**
+- [ ] **접근성 (Accessibility)**: 키보드 내비게이션, 스크린리더 호환, 색상 대비
+- [ ] **에러 핸들링 UX**: 에러 메시지 명확성, 복구 경로 제공
+- [ ] **반응형 (Responsive)**: 모바일/태블릿/데스크톱 뷰포트
+- [ ] **로딩 상태**: 비동기 작업 시 피드백 (스피너, 스켈레톤, progress)
+- [ ] **사용자 플로우 일관성**: 기대 동작과 실제 동작 일치
+
+**판정 기준:**
+- PASS: 모든 해당 체크리스트 통과
+- FAIL: 1개 이상 critical issue 발견
+- SKIPPED: S-items 없음 (자동 PASS 아님, Gate 3 N/A로 기록)
 
 Update state: `gate_results.gate3_passed = true|false`
 
