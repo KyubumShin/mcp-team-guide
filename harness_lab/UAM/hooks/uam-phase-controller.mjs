@@ -58,7 +58,8 @@ function checkPlanStatus(cwd) {
     if (!existsSync(planPath)) continue;
 
     const content = readFileSync(planPath, 'utf-8');
-    const todoPattern = /### \[( |x|FAILED)\]/gi;
+    // Tolerant regex: accepts whitespace variations, case-insensitive x/X, FAILED/failed
+    const todoPattern = /###\s*\[\s*(x|X|FAILED|failed| )\s*\]/g;
     const matches = [...content.matchAll(todoPattern)];
 
     if (matches.length === 0) return { total: 0, completed: 0, failed: 0 };
@@ -66,8 +67,9 @@ function checkPlanStatus(cwd) {
     let completed = 0;
     let failed = 0;
     for (const m of matches) {
-      if (m[1].toLowerCase() === 'x') completed++;
-      else if (m[1].toUpperCase() === 'FAILED') failed++;
+      const val = m[1].trim();
+      if (val.toLowerCase() === 'x') completed++;
+      else if (val.toLowerCase() === 'failed') failed++;
     }
 
     return { total: matches.length, completed, failed };
@@ -254,7 +256,10 @@ async function main() {
         }));
       } else if (gateResults.anyFailed) {
         // Gate failed → Phase 4
-        writeState(cwd, { current_phase: 'phase4-fix', fix_loop_count: 0 });
+        // Preserve existing fix_loop_count to prevent infinite loop bypass
+        // (only initialize to 0 on first entry, not on re-entry from Phase 3)
+        const currentFixCount = state.fix_loop_count || 0;
+        writeState(cwd, { current_phase: 'phase4-fix', fix_loop_count: currentFixCount });
         console.log(JSON.stringify({
           continue: true,
           hookSpecificOutput: {
@@ -303,15 +308,28 @@ async function main() {
     }
 
     case 'phase5-finalize': {
-      // Finalize: complete UAM
-      writeState(cwd, { current_phase: 'completed' });
-      console.log(JSON.stringify({
-        continue: false,
-        hookSpecificOutput: {
-          hookEventName: 'Stop',
-          additionalContext: '[UAM] Phase 5: Finalize complete. UAM pipeline finished. Extract learnings and commit.'
-        }
-      }));
+      // Finalize: do NOT auto-transition to completed here.
+      // The orchestrator must complete finalization tasks (extract learnings, commit)
+      // and then manually set current_phase to 'completed' via writeState.
+      const finalized = state.finalize_done === true;
+      if (finalized) {
+        writeState(cwd, { current_phase: 'completed' });
+        console.log(JSON.stringify({
+          continue: false,
+          hookSpecificOutput: {
+            hookEventName: 'Stop',
+            additionalContext: '[UAM] Phase 5: Finalize complete. UAM pipeline finished.'
+          }
+        }));
+      } else {
+        console.log(JSON.stringify({
+          continue: true,
+          hookSpecificOutput: {
+            hookEventName: 'Stop',
+            additionalContext: '[UAM] Phase 5: Finalize in progress. Extract learnings, commit, then set state.finalize_done = true to complete.'
+          }
+        }));
+      }
       break;
     }
 
