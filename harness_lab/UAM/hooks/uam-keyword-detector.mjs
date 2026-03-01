@@ -12,6 +12,7 @@
 
 import { dirname, join } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -126,6 +127,19 @@ async function main() {
           hookSpecificOutput: {
             hookEventName: 'UserPromptSubmit',
             additionalContext: '[UAM] Pipeline research in progress. Use `/uam:uam-status` to check.'
+          }
+        }));
+        return;
+      }
+
+      // BUG-4 fix: Check for research lock file (another standalone research running)
+      const lockPath = join(cwd, '.uam', 'research', '.lock');
+      if (existsSync(lockPath)) {
+        console.log(JSON.stringify({
+          continue: true,
+          hookSpecificOutput: {
+            hookEventName: 'UserPromptSubmit',
+            additionalContext: '[UAM] Another standalone research is in progress. Wait for it to complete or delete .uam/research/.lock to force.'
           }
         }));
         return;

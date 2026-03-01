@@ -142,6 +142,20 @@ async function main() {
     case 'phase1a-research': {
       // Phase 1-A: Deep Research — check research.status for auto-transition
       const research = state.research || {};
+
+      // BUG-6 fix: handle research error state to prevent infinite loop
+      if (research.error) {
+        writeState(cwd, { current_phase: 'phase1b-plan', research: { status: 'skipped' } });
+        console.log(JSON.stringify({
+          continue: true,
+          hookSpecificOutput: {
+            hookEventName: 'Stop',
+            additionalContext: `[UAM] Research failed: ${research.error}. Skipping to Phase 1-B: Plan Generation (without research).`
+          }
+        }));
+        break;
+      }
+
       if (research.status === 'completed' || research.status === 'skipped') {
         // Research done → transition to Phase 1-B: Plan Generation
         writeState(cwd, { current_phase: 'phase1b-plan' });

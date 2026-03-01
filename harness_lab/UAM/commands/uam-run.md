@@ -90,15 +90,22 @@ Research can be skipped when ALL of these are true:
 
 스킵 시: `writeState(cwd, { research: { status: 'skipped' }, current_phase: 'phase1b-plan' })`
 
-### Token Budget Guard
+### Token Budget Guard (Heuristic)
 
-연구 토큰 상한: 전체 예산의 20% (full: 100K tokens)
+연구 토큰 상한 목표: 전체 예산의 20% (full: ~100K tokens)
+
+> **주의**: `cost.total_tokens`는 자동 추적되지 않는다. 오케스트레이터가 각 Stage 완료 후
+> 에이전트 응답 길이를 근사 토큰으로 환산(1 token ≈ 4 chars)하여 수동 업데이트해야 한다.
+> `writeState(cwd, { cost: { total_tokens: estimated } })`
 
 ```
-Stage 완료 시마다 cost.total_tokens 확인:
+Stage 완료 시마다 오케스트레이터가 cost.total_tokens를 갱신한 후 확인:
 - Stage 1 완료 후 > 15% 사용: Stage 2를 TOP 2로 축소 (3→2)
 - Stage 2 완료 후 > 18% 사용: Stage 3를 간략 모드로 전환 (full schema → brief schema)
 - 언제든 > 20% 도달: 즉시 현재 Stage 결과로 종합 → Phase 1-B 전환
+
+토큰 추적이 불가능한 환경에서는 Stage 수로 제한:
+- 3 Stage 모두 실행하되, Stage 2 deep-dive 대상을 TOP 2로 제한 (3→2)
 ```
 
 ### Step 1: Broad Scan (병렬)
@@ -209,7 +216,10 @@ writeState(cwd, {
 })
 ```
 
-Stage 캐시 파일 삭제 (report.md만 유지).
+Stage 캐시 파일 정리 (report.md만 유지):
+```
+Bash: rm -f .uam/research/stage1-cache.md .uam/research/stage2-cache.md
+```
 
 ---
 

@@ -83,9 +83,24 @@ Light research 완료 후 `.uam/research/brief.md` 작성:
 ```
 AskUserQuestion: "연구 결과 복잡도가 높습니다. 어떻게 하시겠습니까?"
 Options:
-  1. "Full pipeline으로 전환" → run_mode 변경, Phase 1-A로 재시작
+  1. "Full pipeline으로 전환" → 아래 에스컬레이션 절차 실행
   2. "경량으로 계속" → brief.md 생성 후 진행
   3. "독립 연구 먼저" → /uam:uam-research 안내
+```
+
+**Full pipeline 에스컬레이션 절차** (Option 1 선택 시):
+```
+1. 기존 light research 결과 보존: .uam/research/brief.md 유지
+2. run_mode만 변경 (initState 재호출 금지 — 상태 리셋 방지):
+   writeState(cwd, {
+     run_mode: 'full',
+     current_phase: 'phase1a-research',
+     max_fix_loops: 10,
+     cost: { max_total_tokens: 500000 },
+     research: { status: 'stage1', mode: 'full' }
+   })
+3. Phase 1-A Stage 1에서 brief.md를 기존 연구로 참조 (중복 조사 방지)
+4. /uam:uam-run 프로토콜로 전환
 ```
 
 **Agents NOT used in small mode** (vs full pipeline):
