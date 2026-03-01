@@ -55,6 +55,7 @@ OMC, hoyeon, SG-Loop 세 시스템의 강점을 하나의 5-Phase 파이프라�
 | `uam-git-master` | Sonnet | 2, 5 | 원자적 커밋 |
 | `uam-code-reviewer` | Sonnet | 3 | 멀티모델 교차 리뷰 |
 | `uam-debugger` | Sonnet | 4 | 근본 원인 분석 |
+| `uam-doctor` | Haiku | - | 설치 진단 |
 
 Judge는 에이전트가 아닌 오케스트레이터 내부 로직.
 
@@ -72,6 +73,8 @@ Judge는 에이전트가 아닌 오케스트레이터 내부 로직.
 | `uam-resume` | `/uam:uam-resume` | 이전 Phase에서 재개 |
 | `uam-bugfix` | `/uam:uam-bugfix` | 독립형 적응적 버그 수정 |
 | `uam-compound` | `/uam:uam-compound` | 학습 추출 + 지식 증류 |
+| `uam-doctor` | `/uam:uam-doctor` | 설치 진단 + 건강 체크 |
+| `uam-setup` | `/uam:uam-setup` | 설치, 설정, 복구 마법사 |
 
 커맨드: `/uam:uam-run` (5-Phase 상세 프로토콜), `/uam:uam-small-run` (3-Phase 경량 프로토콜)
 

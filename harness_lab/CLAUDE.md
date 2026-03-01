@@ -43,6 +43,8 @@ UAM (Unified Agent Methodology)은 OMC, hoyeon, SG-Loop 세 시스템의 강점�
 - **Keyword**: 사용자 입력에 `uam` 포함 시 자동 활성화
 - **Skill**: `/project:uam` 으로 전체 파이프라인 활성화
 - **Command**: `/project:uam-run` 으로 상세 오케스트레이션 프로토콜 로드
+- **Setup**: `/uam:uam-setup` 으로 설치 및 설정
+- **Doctor**: `/uam:uam-doctor` 으로 설치 상태 진단
 
 ### Core Principle: Orchestrator-Worker Separation
 
