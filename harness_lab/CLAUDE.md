@@ -56,23 +56,25 @@ UAM (Unified Agent Methodology)은 OMC, hoyeon, SG-Loop 세 시스템의 강점�
 
 | Phase | 이름 | 에이전트 | 핵심 산출물 |
 |-------|------|---------|-----------|
-| 1 | Quick Plan | explore, gap-analyzer, tradeoff-analyzer, verification-planner, **pm**, **designer**, **researcher** | PLAN.md (체크박스 SSOT) |
+| 1-A | Deep Research | explore, **researcher** (Stage 1+2), **research-synthesizer** (Stage 3) | `.uam/research/report.md` |
+| 1-B | Plan Generation | gap-analyzer, tradeoff-analyzer, verification-planner, **pm**, **designer** | PLAN.md (체크박스 SSOT, 연구 결과 포함) |
 | 2 | MVP Sprint | worker, **frontend** (병렬), git-master | 구현된 코드 + 원자적 커밋 |
 | 3 | Quality Gate | code-reviewer + Judge 로직 | Gate 1-3 통과/실패 판정 |
 | 4 | Fix Loop | worker, debugger | 적응적 3단계 수정 |
 | 5 | Finalize | git-master | 학습 추출 + project-memory |
 
-### Agent Catalog (12 agents + Judge logic)
+### Agent Catalog (13 agents + Judge logic)
 
 | Agent | Model | disallowedTools | Phase | 역할 |
 |-------|-------|-----------------|-------|------|
-| `uam-explore` | haiku | Write, Edit, Task | 1 | 코드베이스 탐색 |
-| `uam-gap-analyzer` | haiku | Write, Edit, Bash, Task | 1 | 누락 요구사항 식별 |
-| `uam-tradeoff-analyzer` | sonnet | Write, Edit, Bash, Task | 1 | 위험도 평가 |
-| `uam-verification-planner` | sonnet | Write, Edit, Bash, Task | 1 | A/S/H 테스트 분류 |
-| `uam-pm` | **opus** | Write, Edit, Bash, Task | 1 | 요구사항 정제, 사용자 스토리, 우선순위 |
-| `uam-designer` | sonnet | Write, Edit, Bash, Task | 1, 3 | UX/UI 설계, 컴포넌트 구조, 접근성 |
-| `uam-researcher` | sonnet | Write, Edit, Task | 1 | 기술 조사, 선행 사례, 라이브러리 평가 |
+| `uam-explore` | haiku | Write, Edit, Task | 1-A, 1-B | 코드베이스 탐색 |
+| `uam-gap-analyzer` | haiku | Write, Edit, Bash, Task | 1-B | 누락 요구사항 식별 |
+| `uam-tradeoff-analyzer` | sonnet | Write, Edit, Bash, Task | 1-B | 위험도 평가 |
+| `uam-verification-planner` | sonnet | Write, Edit, Bash, Task | 1-B | A/S/H 테스트 분류 |
+| `uam-pm` | **opus** | Write, Edit, Bash, Task | 1-B | 요구사항 정제, 사용자 스토리, 우선순위 |
+| `uam-designer` | sonnet | Write, Edit, Bash, Task | 1-B, 3 | UX/UI 설계, 컴포넌트 구조, 접근성 |
+| `uam-researcher` | sonnet | Write, Edit, Task | 1-A | 3단계 연구: Stage 1 Broad Scan, Stage 2 Deep-Dive |
+| `uam-research-synthesizer` | sonnet | Write, Edit, Bash, Task | 1-A | Stage 3 종합: 연구 결과 합성, 옵션 비교, 권장사항 |
 | `uam-worker` | sonnet | Task | 2, 4 | TODO 구현 (범용) |
 | `uam-frontend` | sonnet | Task | 2, 4 | 프론트엔드 구현 (UI/CSS/컴포넌트) |
 | `uam-git-master` | sonnet | Write, Edit, Task | 2, 5 | 원자적 커밋 |
