@@ -67,3 +67,27 @@ PreToolUse 훅이 Edit/Write를 차단하며, 모든 코드 변경은 `uam-worke
 
 전체 사양: `UAM/docs/design_unified_agent_methodology.md`
 빠른 참조: `UAM/README.md`
+
+## MPL Plugin
+
+MPL(Micro-Phase Loop)은 독립 플러그인으로, 태스크를 마이크로 페이즈로 분해하여
+각각 독립적으로 계획-실행-검증하는 구조화된 파이프라인이다.
+
+### Activation
+
+- **Keyword**: 사용자 입력에 `mpl` 포함 시 자동 활성화
+- **Skill**: `/mpl:mpl` 으로 파이프라인 활성화
+- **Setup**: `/mpl:mpl-setup` 으로 설치
+- **Doctor**: `/mpl:mpl-doctor` 으로 진단
+
+### Core Principle: Orchestrator-Worker Separation
+
+> **오케스트레이터는 절대 소스 코드를 직접 작성하지 않는다.**
+
+PreToolUse 훅이 Edit/Write를 차단하며, 모든 코드 변경은 `mpl-worker` 에이전트에게 Task 도구로 위임한다.
+
+### Design Reference
+
+전체 사양: `MPL/docs/design.md`
+로드맵: `MPL/docs/roadmap/overview.md`
+빠른 참조: `MPL/README.md`
