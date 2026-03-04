@@ -147,6 +147,7 @@ disallowedTools: []
     - "수정된 것" (What was modified): existing files changed and what changed
     - "Discovery 처리 결과" (Discovery handling results): each discovery's disposition
     - "다음 phase를 위한 참고" (Notes for next phase): environment variables added, import paths, interface specs, deferred discoveries
+    - "프로파일" (Profile): estimated token usage (context size, output size), micro-fix count, duration
   </State_Summary_Required_Sections>
 
   <Output_Schema>

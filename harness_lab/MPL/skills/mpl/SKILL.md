@@ -50,6 +50,9 @@ mpl-init -> mpl-decompose -> mpl-phase-running <-> mpl-phase-complete
 | `.mpl/mpl/phase0/examples.md` | Example pattern analysis (Medium+) |
 | `.mpl/mpl/phase0/type-policy.md` | Type policy definition (Complex+) |
 | `.mpl/mpl/phase0/error-spec.md` | Error handling specification (All) |
+| `.mpl/cache/phase0/manifest.json` | Phase 0 cache metadata |
+| `.mpl/mpl/profile/phases.jsonl` | Per-phase token/timing profile |
+| `.mpl/mpl/profile/run-summary.json` | Complete run profile |
 | `.mpl/mpl/phases/phase-N/` | Per-phase artifacts (mini-plan, state-summary, verification) |
 | `.mpl/pivot-points.md` | Immutable constraints (shared with standard mode) |
 

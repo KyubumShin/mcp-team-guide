@@ -68,6 +68,25 @@ Redecomposition: `max_redecompose = 2`. Exceeding triggers `mpl-failed`.
 | `state-summary.md` | Completion summary (knowledge transfer to next phase) |
 | `verification.md` | Verification results (criteria pass/fail with evidence) |
 
+### Cache Artifacts: `.mpl/cache/phase0/`
+
+| File | Purpose |
+|------|---------|
+| `manifest.json` | Cache metadata (key, timestamp, grade, artifact list) |
+| `api-contracts.md` | Cached API contract specification |
+| `examples.md` | Cached example pattern analysis |
+| `type-policy.md` | Cached type policy definition |
+| `error-spec.md` | Cached error handling specification |
+| `summary.md` | Cached Phase 0 summary |
+| `complexity-report.json` | Cached complexity report |
+
+### Profile Artifacts: `.mpl/mpl/profile/`
+
+| File | Purpose |
+|------|---------|
+| `phases.jsonl` | Per-phase token/timing profile (append-only, JSONL) |
+| `run-summary.json` | Complete run profile (generated at finalize) |
+
 ---
 
 ## Model Routing
@@ -168,6 +187,49 @@ Output: `env_vars` (name, used_in[]), `config_files` (path, purpose), `package_j
 Phase 0 Enhanced는 Step 2의 Codebase Analysis 결과를 기반으로 프로젝트 복잡도를 측정하고, 복잡도에 따라 사전 명세를 생성한다. 이 명세는 후속 Phase(Decomposition, Execution)의 정확도를 높이고 디버깅 Phase를 불필요하게 만든다.
 
 > **원칙**: "예방이 치료보다 낫다" — Phase 0에 투자하는 토큰이 Phase 5의 디버깅 비용을 완전히 제거한다.
+
+### 2.5.0: Cache Check (Phase 0 캐싱)
+
+Phase 0 실행 전에 캐시를 확인한다. 캐시 히트 시 Phase 0 전체를 스킵하여 8~25K 토큰을 절감한다.
+
+```
+cache_dir = ".mpl/cache/phase0/"
+cache_key = generate_cache_key(codebase_analysis)
+
+if cache_dir exists AND cache_key matches:
+  cached = Read(cache_dir + "manifest.json")
+  if cached.cache_key == cache_key:
+    → Load all cached artifacts to .mpl/mpl/phase0/
+    → Report: "[MPL] Phase 0 cache HIT. Skipping analysis. Saved ~{budget}K tokens."
+    → Skip to Step 3 (Phase Decomposition)
+  else:
+    → Cache stale, proceed with Phase 0
+else:
+  → No cache, proceed with Phase 0
+```
+
+#### Cache Key Generation
+
+```
+generate_cache_key(codebase_analysis):
+  inputs = {
+    test_files_hash:  hash(content of all test files),
+    structure_hash:   hash(codebase_analysis.directories),
+    deps_hash:        hash(codebase_analysis.external_deps),
+    source_files_hash: hash(content of source files touching public API)
+  }
+  return sha256(JSON.stringify(inputs))
+```
+
+#### Cache Invalidation
+
+| 변경 사항 | 캐시 동작 |
+|----------|----------|
+| 테스트 파일 내용 변경 | 전체 캐시 무효화 |
+| 소스 파일 공개 API 변경 | 전체 캐시 무효화 |
+| 의존성 버전 변경 | 관련 계약만 무효화 |
+| 디렉토리 구조 변경 | 구조 관련 캐시만 무효화 |
+| `--no-cache` 플래그 | 강제 캐시 무시 |
 
 ### 2.5.1: Complexity Detection
 
@@ -419,6 +481,83 @@ Announce: `[MPL] Complexity: {score} ({grade}). Phase 0 steps: {step_list}`
 
 Announce: `[MPL] Phase 0 Enhanced complete. Grade: {grade}. Artifacts: {count}/4 generated. Token budget: {budget}.`
 
+### 2.5.7: Artifact Validation
+
+Phase 0 산출물의 품질을 자동 검증한다:
+
+```
+for each generated artifact:
+  validate_artifact(artifact):
+    1. Structure check: 필수 섹션이 존재하는지 확인
+       - api-contracts.md: "## [모듈명]" + "### [함수명]" 섹션 존재
+       - examples.md: "## 패턴" 섹션 + 코드 블록 존재
+       - type-policy.md: "## 규칙" + "## 타입 참조표" 섹션 존재
+       - error-spec.md: "## [모듈] 에러" 섹션 존재
+    2. Coverage check: 테스트에서 호출되는 함수가 계약에 포함되었는지
+       - ast_grep_search로 테스트의 함수 호출 목록 추출
+       - api-contracts.md의 함수 목록과 비교
+       - 누락률 > 20% → 경고
+    3. Consistency check: 아티팩트 간 상호 참조 일관성
+       - api-contracts의 타입 ↔ type-policy의 타입 일치
+       - api-contracts의 예외 ↔ error-spec의 예외 일치
+
+  if validation fails:
+    → Report: "[MPL] Phase 0 artifact validation WARNING: {details}"
+    → Attempt auto-fix (re-run failed step with narrower focus)
+    → Max 1 retry per artifact
+
+Report: "[MPL] Phase 0 validation: {passed}/{total} artifacts validated."
+```
+
+### 2.5.8: Cache Save
+
+Phase 0 실행이 완료되면 결과를 캐시에 저장한다:
+
+```
+cache_dir = ".mpl/cache/phase0/"
+cache_key = generate_cache_key(codebase_analysis)
+
+save_to_cache:
+  1. Create cache_dir if not exists
+  2. Copy all phase0 artifacts to cache_dir
+  3. Write manifest.json:
+     {
+       "cache_key": cache_key,
+       "created_at": timestamp,
+       "grade": complexity_grade,
+       "artifacts": ["api-contracts.md", "examples.md", ...],
+       "validation_result": { passed: N, total: M }
+     }
+  4. Report: "[MPL] Phase 0 artifacts cached. Key: {short_key}."
+```
+
+### 2.5.9: Token Profiling (Phase 0)
+
+Phase 0 실행의 토큰 사용량을 기록한다:
+
+```
+phase0_profile = {
+  "step": "phase0-enhanced",
+  "grade": complexity_grade,
+  "cache_hit": false,
+  "steps_executed": [1, 3, 4],
+  "artifacts_generated": 3,
+  "validation_passed": 3,
+  "estimated_tokens": {
+    "complexity_detection": ~500,
+    "step1_api_contracts": ~5000,
+    "step2_examples": 0,
+    "step3_type_policy": ~3000,
+    "step4_error_spec": ~3000,
+    "validation": ~500,
+    "total": ~12000
+  },
+  "duration_ms": elapsed
+}
+
+Append to .mpl/mpl/profile/phases.jsonl
+```
+
 ---
 
 ## Step 3: Phase Decomposition
@@ -642,9 +781,20 @@ result = Task(subagent_type="mpl-phase-runner", model="sonnet",
    totals.total_micro_fixes += result.verification.micro_cycle_fixes
    cumulative_pass_rate = result.verification.pass_rate
 7. Update pipeline state: current_phase = "mpl-phase-complete"
-8. Report: "[MPL] Phase N/total 완료: {name}. Pass rate: {pass_rate}%. Micro-fixes: {micro_fixes}. PD {count}건."
-9. More phases -> current_phase = "mpl-phase-running", continue 4.1
-10. All done -> proceed to Step 4.5 (Final Verification Gate)
+8. Profile: Record phase execution profile to .mpl/mpl/profile/phases.jsonl:
+   {
+     "step": "phase-{N}",
+     "name": phase_name,
+     "pass_rate": pass_rate,
+     "micro_fixes": micro_fixes,
+     "criteria_passed": "X/Y",
+     "estimated_tokens": { "context": ~ctx_size, "output": ~out_size, "total": ~total },
+     "retries": retry_count,
+     "duration_ms": elapsed
+   }
+9. Report: "[MPL] Phase N/total 완료: {name}. Pass rate: {pass_rate}%. Micro-fixes: {micro_fixes}. PD {count}건."
+10. More phases -> current_phase = "mpl-phase-running", continue 4.1
+11. All done -> proceed to Step 4.5 (Final Verification Gate)
 ```
 
 **On `"circuit_break"`**:
@@ -799,9 +949,42 @@ Save to `.mpl/mpl/metrics.json`:
   "total_retries": 2, "total_micro_fixes": 3, "redecompositions": 0,
   "total_discoveries": 3, "total_pd_count": 8, "total_pd_overrides": 1,
   "final_pass_rate": 100, "phase5_skipped": true,
+  "phase0_cache_hit": false,
+  "phase0_grade": "Complex",
+  "phase0_artifacts_validated": "3/3",
+  "token_profile": {
+    "phase0": 12000,
+    "phases": [10000, 12000, 8000, 5000],
+    "phase5_gate": 500,
+    "finalize": 2000,
+    "total_estimated": 49500
+  },
   "elapsed_ms": 720000, "final_verification": "all_pass"
 }
 ```
+
+Generate full run profile at `.mpl/mpl/profile/run-summary.json`:
+```json
+{
+  "run_id": "mpl-{timestamp}",
+  "complexity": { "grade": "Complex", "score": 85 },
+  "cache": { "phase0_hit": false, "saved_tokens": 0 },
+  "phases": [
+    { "id": "phase0", "tokens": 12000, "duration_ms": 15000, "cache_hit": false },
+    { "id": "phase-1", "tokens": 10000, "duration_ms": 45000, "pass_rate": 100, "micro_fixes": 0 },
+    { "id": "phase-2", "tokens": 12000, "duration_ms": 60000, "pass_rate": 100, "micro_fixes": 1 },
+    { "id": "phase-3", "tokens": 8000, "duration_ms": 40000, "pass_rate": 100, "micro_fixes": 0 },
+    { "id": "phase-4", "tokens": 5000, "duration_ms": 30000, "pass_rate": 100, "micro_fixes": 0 }
+  ],
+  "phase5_gate": { "final_pass_rate": 100, "decision": "skip", "fix_tokens": 0 },
+  "totals": { "tokens": 49500, "duration_ms": 210000, "micro_fixes": 1, "retries": 0 }
+}
+```
+
+Profile data enables:
+1. **복잡도별 최적 토큰 예산 학습**: 과거 프로파일에서 등급별 평균 토큰 산출
+2. **Phase 0 Step 조합 최적화**: 어떤 Step 조합이 가장 효율적인지 통계
+3. **비정상 실행 탐지**: 토큰 과다 사용(평균의 2x 이상), 과도한 마이크로 수정(5회+) 경고
 
 ### 5.5: Completion Report
 
