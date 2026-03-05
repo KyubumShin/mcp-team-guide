@@ -177,8 +177,9 @@ export function initState(cwd, featureName, runMode = 'full') {
 
 /**
  * Check convergence of fix loop pass rates
+ * Enhanced in v3: stagnation detection with variance, regression detection, strategy suggestions
  * @param {object} state - Current MPL state
- * @returns {{ status: string, delta?: number }}
+ * @returns {{ status: string, delta?: number, suggestion?: string }}
  */
 export function checkConvergence(state) {
   const conv = state?.convergence;
@@ -189,10 +190,39 @@ export function checkConvergence(state) {
 
   const windowSize = Math.min(stagnation_window, pass_rate_history.length);
   const recent = pass_rate_history.slice(-windowSize);
-  const improvement = recent[recent.length - 1] - recent[0];
+  const latest = recent[recent.length - 1];
+  const earliest = recent[0];
+  const improvement = latest - earliest;
 
-  if (improvement < regression_threshold) return { status: 'regression', delta: improvement };
-  if (recent.length >= stagnation_window && improvement < min_improvement) return { status: 'stagnant', delta: improvement };
+  // v3: Regression detection (delta < -10%)
+  if (improvement < regression_threshold) {
+    return {
+      status: 'regressing',
+      delta: improvement,
+      suggestion: 'Pass rate is declining. Consider reverting to last known good state or reviewing Phase 0 artifacts.'
+    };
+  }
+
+  // v3: Stagnation detection with variance check
+  if (recent.length >= stagnation_window) {
+    // Calculate variance of recent pass rates
+    const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const variance = recent.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / recent.length;
+
+    if (variance < 0.0025 && improvement < min_improvement) {
+      // variance < 5% (0.05^2 = 0.0025) AND no meaningful improvement
+      return {
+        status: 'stagnating',
+        delta: improvement,
+        suggestion: 'Fix loop is not making progress. Try a different strategy: change implementation approach, consult Phase 0 artifacts, or escalate to redecomposition.'
+      };
+    }
+
+    if (improvement < min_improvement) {
+      return { status: 'stagnant', delta: improvement, suggestion: 'Improvement is below threshold. Consider changing fix strategy.' };
+    }
+  }
+
   return { status: 'improving', delta: improvement };
 }
 

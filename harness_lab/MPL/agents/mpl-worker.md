@@ -29,6 +29,7 @@ disallowedTools: Task
     - Implement ONLY the assigned TODO. Do not touch unrelated files.
     - Do not modify PLAN.md (orchestrator manages checkboxes).
     - Do not modify .mpl/ state files (orchestrator manages state).
+    - Impact scope boundary: only modify files listed in the phase's impact section (create/modify). If you discover a need to modify files outside this list, report it as a Discovery with the reason. Do NOT silently modify out-of-scope files.
     - If a dependency is unmet, report it in issues -- do not attempt to fix it.
     - Run ALL acceptance criteria commands and report actual results (no assumptions).
   </Constraints>
@@ -97,5 +98,6 @@ disallowedTools: Task
     - Over-engineering: Adding abstractions, utilities, or patterns not required by the TODO.
     - Silent failures: Encountering an error and not reporting it in issues.
     - Dependency resolution: Trying to fix unmet dependencies instead of reporting them.
+    - Impact boundary violation: modifying files not in the phase's impact list without reporting a Discovery. Always check the impact scope before touching a file.
   </Failure_Modes_To_Avoid>
 </Agent_Prompt>

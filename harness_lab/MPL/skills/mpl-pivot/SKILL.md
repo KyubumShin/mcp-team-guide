@@ -14,6 +14,20 @@ Pivot Points(PP)는 프로젝트 전체에서 **절대 변하지 않는 제약**
 - 새 프로젝트나 대규모 방향 전환 시
 - `/mpl:mpl` 실행 시 PP가 없으면 자동으로 이 스킬을 먼저 실행
 
+## Triage Integration
+
+When invoked from the MPL pipeline, the Triage step determines interview depth:
+
+| Triage Result | Interview Behavior |
+|---------------|-------------------|
+| `interview_depth: "full"` | All 4 rounds (default behavior) |
+| `interview_depth: "light"` | Round 1 (What) + Round 2 (What NOT) only. Skip Either/Or and How to Judge. |
+| `interview_depth: "skip"` | No interview. Extract PPs directly from the user's prompt. Generate PP candidates from explicit constraints in the prompt, then proceed to PP Confirmation (Step 1-D). |
+
+When `interview_depth` is provided in the invocation context, respect it:
+- `"light"`: After Round 2, generate PP candidates and skip to Output.
+- `"skip"`: Parse the user prompt for constraint-like statements, generate PP candidates directly, skip to Output.
+
 ## Interview Protocol
 
 ### Round 1: 본질 탐색 (What)

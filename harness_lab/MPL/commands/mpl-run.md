@@ -99,7 +99,33 @@ Redecomposition: `max_redecompose = 2`. Exceeding triggers `mpl-failed`.
 
 ---
 
-## Step 0: Maturity Mode Detection
+## Step 0: Triage
+
+Use haiku-level analysis to classify the user's prompt and determine interview depth.
+
+```
+interview_depth = classify_prompt(user_request):
+  information_density = count(explicit_constraints, specific_files, measurable_criteria, tradeoff_choices)
+
+  if information_density >= 8 AND has_explicit_constraints AND has_success_criteria:
+    -> "skip" (prompt is PP-grade; extract PPs directly)
+  elif information_density >= 4 AND has_some_constraints:
+    -> "light" (Round 1 + Round 2 only)
+  else:
+    -> "full" (all 4 rounds)
+```
+
+| interview_depth | Condition | Interview Behavior |
+|-----------------|-----------|-------------------|
+| `"full"` | Vague/broad requests (density < 4) | PP 4-round full interview (default) |
+| `"light"` | Specific but incomplete (density 4-7) | What + What NOT only |
+| `"skip"` | Very detailed with constraints (density 8+) | Extract PPs directly from prompt |
+
+Announce: `[MPL] Triage: interview_depth = {depth}. Prompt density: {score}.`
+
+---
+
+## Step 0.5: Maturity Mode Detection
 
 Read `.mpl/config.json` for `maturity_mode` (default: `"standard"`).
 
@@ -117,13 +143,24 @@ Announce: `[MPL] Maturity mode: {mode}. Phase sizing: {S/M/L}`
 
 Reuse existing `mpl-pivot` skill for Pivot Points.
 
+When `interview_depth != "skip"` (from Step 0 Triage), the orchestrator spawns `mpl-interviewer` as a Task agent to conduct the interview. The interview rounds are controlled by `interview_depth`:
+- `"full"`: All 4 rounds of PP interview
+- `"light"`: Round 1 (What) + Round 2 (What NOT) only
+
+When `interview_depth == "skip"`, PPs are extracted directly from the user's prompt without spawning an interviewer agent. The orchestrator parses explicit constraints, success criteria, and tradeoff choices from the prompt and formats them as Pivot Points.
+
 ```
-if .mpl/pivot-points.md exists -> Load PPs and proceed to Step 2
+if .mpl/pivot-points.md exists -> Load PPs and proceed to Step 1-B
+
+elif interview_depth == "skip":
+  -> Extract PPs directly from user prompt
+  -> Save to .mpl/pivot-points.md
+  -> Proceed to Step 1-B
 
 else:
   AskUserQuestion: "프로젝트의 핵심 제약사항(Pivot Points)을 정의할까요?"
   Options:
-    1. "인터뷰 시작" -> Run /mpl:mpl-pivot interview
+    1. "인터뷰 시작" -> Run mpl-interviewer with interview_depth setting
     2. "건너뛰기"    -> Proceed without PPs (explore mode only)
     3. "기존 PP 로드" -> Read from .mpl/pivot-points.md
 
@@ -131,6 +168,81 @@ if maturity_mode == "explore" -> PP is optional, skip if user declines
 ```
 
 PP States: **CONFIRMED** (hard constraint, auto-reject on conflict) / **PROVISIONAL** (soft, HITL on conflict)
+
+---
+
+## Step 1-B: Gap Analysis
+
+After PPs are confirmed, run gap analysis to identify missing requirements before decomposition.
+
+```
+Task(subagent_type="mpl-gap-analyzer", model="haiku",
+     prompt="""
+     ## Input
+     ### User Request
+     {user_request}
+     ### Pivot Points
+     {pivot_points from .mpl/pivot-points.md}
+     ### Codebase Analysis
+     {codebase_analysis from .mpl/mpl/codebase-analysis.json}
+
+     Analyze gaps, pitfalls, and constraints.
+     """)
+```
+
+### After Receiving Output
+1. Validate 4 required sections via validate-output hook
+2. If "Recommended Questions" section has items with HIGH impact:
+   - Present top 3 questions to user via AskUserQuestion
+   - Incorporate answers into PP refinement if needed
+3. Save gap analysis to `.mpl/mpl/gap-analysis.md`
+4. Report: `[MPL] Gap Analysis: {MR_count} missing requirements, {AP_count} pitfalls, {MND_count} constraints identified.`
+
+---
+
+## Step 1-C: Tradeoff Analysis
+
+Assess risk and recommend execution ordering for the decomposer.
+
+```
+Task(subagent_type="mpl-tradeoff-analyzer", model="sonnet",
+     prompt="""
+     ## Input
+     ### User Request
+     {user_request}
+     ### Pivot Points
+     {pivot_points}
+     ### Gap Analysis Results
+     {gap_analysis from .mpl/mpl/gap-analysis.md}
+     ### Codebase Analysis
+     {codebase_analysis}
+
+     Assess risk levels and recommend execution order.
+     """)
+```
+
+### After Receiving Output
+1. Validate 3 required sections via validate-output hook
+2. Save to `.mpl/mpl/tradeoff-analysis.md`
+3. Pass "Recommended Execution Order" to the decomposer in Step 3
+4. Report: `[MPL] Tradeoff Analysis: Aggregate risk {level}. {irreversible_count} irreversible changes.`
+
+---
+
+## Step 1-D: PP Confirmation
+
+Present a unified summary of PPs + Gap Analysis + Tradeoff Analysis for engineer confirmation.
+
+```
+AskUserQuestion with 4 options:
+1. "Approve All" -> proceed to Step 2
+2. "Modify PPs" -> edit specific PPs, then re-run 1-B/1-C with updated PPs, return to 1-D
+3. "Add New PP" -> add PP, then re-run 1-B/1-C, return to 1-D
+4. "Re-interview" -> return to Step 1
+```
+
+This is a confirmation gate. Do not proceed to decomposition without explicit approval.
+Save confirmation timestamp to `.mpl/mpl/state.json` as `pp_confirmed_at`.
 
 ---
 
@@ -589,8 +701,14 @@ Task(subagent_type="mpl-decomposer", model="opus",
      {type_policy from .mpl/mpl/phase0/type-policy.md — if exists}
      {error_spec from .mpl/mpl/phase0/error-spec.md — always exists}
 
+     ### Gap Analysis
+     {gap_analysis from .mpl/mpl/gap-analysis.md}
+
+     ### Tradeoff Analysis (Recommended Execution Order)
+     {tradeoff_analysis from .mpl/mpl/tradeoff-analysis.md}
+
      ## Task
-     Break the user request into ordered phases. Use Phase 0 artifacts to inform decomposition decisions — they contain pre-analyzed API contracts, usage patterns, type policies, and error specifications. Output YAML only.
+     Break the user request into ordered phases. Use Phase 0 artifacts to inform decomposition decisions — they contain pre-analyzed API contracts, usage patterns, type policies, and error specifications. Use the Tradeoff Analysis's Recommended Execution Order to guide phase ordering. Output YAML only.
      Each phase: id, name, scope, impact (create/modify/affected_tests/affected_config),
      interface_contract (requires/produces), success_criteria (typed: command/test/file_exists/grep/description),
      estimated_complexity (S/M/L).
@@ -610,6 +728,70 @@ Task(subagent_type="mpl-decomposer", model="opus",
 
 ---
 
+## Step 3-B: Verification Planning
+
+After decomposition, create per-phase verification plans with A/S/H-item classification.
+
+```
+Task(subagent_type="mpl-verification-planner", model="sonnet",
+     prompt="""
+     ## Input
+     ### Phase Decomposition
+     {decomposition YAML from .mpl/mpl/decomposition.yaml}
+     ### Pivot Points
+     {pivot_points}
+     ### Codebase Analysis
+     {codebase_analysis}
+     ### Gap Analysis
+     {gap_analysis}
+
+     Classify all criteria into A/S/H items per phase.
+     """)
+```
+
+### After Receiving Output
+1. Validate 6 required sections via validate-output hook
+2. Parse A/S/H items and attach to each phase_definition as `verification_plan` field
+3. Save full plan to `.mpl/mpl/verification-plan.md`
+4. Note phases with H-items (these will trigger Side Interviews during execution)
+5. Report: `[MPL] Verification Plan: {A_count} A-items, {S_count} S-items, {H_count} H-items across {phase_count} phases.`
+
+---
+
+## Step 3-C: Critic Simulation
+
+Pre-mortem simulation before committing to execution.
+
+```
+Task(subagent_type="mpl-critic", model="opus",
+     prompt="""
+     ## Input
+     ### Pivot Points
+     {pivot_points}
+     ### Phase Decomposition
+     {decomposition YAML}
+     ### Gap Analysis
+     {gap_analysis}
+     ### Tradeoff Analysis
+     {tradeoff_analysis}
+     ### Verification Plan
+     {verification_plan}
+
+     Perform pre-mortem simulation. Identify risks and design drift vectors.
+     """)
+```
+
+### After Receiving Output
+1. If any HIGH severity risks:
+   - Present to user via AskUserQuestion:
+     Options: "Proceed as planned" | "Modify phases" | "Re-decompose"
+   - "Modify phases": apply specific changes, re-run 3-B verification planning
+   - "Re-decompose": return to Step 3 with critic feedback
+2. Save to `.mpl/mpl/critic-report.md`
+3. Report: `[MPL] Critic: {risk_count} risks ({high_count} HIGH). Assessment: {READY|READY_WITH_CAVEATS|NOT_READY}.`
+
+---
+
 ## Step 4: Phase Execution Loop (CORE)
 
 For each phase in order:
@@ -624,7 +806,9 @@ context = {
   phase_definition: phases[current_index],
   impact_files:     load_impact_files(phase.impact),
   maturity_mode:    config.maturity_mode,
-  prev_summary:     Read previous phase's state-summary.md (if available)
+  prev_summary:     Read previous phase's state-summary.md (if available),
+  dep_summaries:    load_dependency_summaries(current_phase),  // All phases referenced in interface_contract.requires
+  verification_plan:  load_phase_verification_plan(current_phase)  // A/S/H items for this phase
 }
 ```
 
@@ -651,6 +835,24 @@ load_phase0_artifacts():
   // Full artifacts only for Phase 1-2 (foundation phases)
   // Later phases: summary only (unless phase impacts Phase 0 artifact areas)
   return artifacts
+```
+
+#### Dependency-Based Summary Loading
+
+```
+load_dependency_summaries(current_phase):
+  deps = current_phase.interface_contract.requires || []
+  summaries = {}
+  for each dep in deps:
+    from_phase = dep.from_phase
+    if from_phase != previous_phase:  // previous phase already loaded via prev_summary
+      summary_path = ".mpl/mpl/phases/{from_phase}/state-summary.md"
+      if exists(summary_path):
+        summaries[from_phase] = Read(summary_path)
+
+  // Token budget: max 30% of model context for all injected summaries
+  // If over budget: trim summaries to first 100 lines each
+  return summaries
 ```
 
 #### PD 3-Tier Classification
@@ -732,6 +934,9 @@ result = Task(subagent_type="mpl-phase-runner", model="sonnet",
      ## Previous Phase State Summary
      {previous phase's state-summary.md if available, or "N/A (first phase)"}
 
+     ## Dependency Phase Summaries
+     {dep_summaries — summaries from non-adjacent dependency phases, or "N/A"}
+
      ## Phase 0 Enhanced Artifacts
      ### Complexity: {grade} (score: {score})
      ### Summary
@@ -744,6 +949,9 @@ result = Task(subagent_type="mpl-phase-runner", model="sonnet",
      {type_policy or "N/A — below complexity threshold"}
      ### Error Specification
      {error_spec}
+
+     ## Verification Plan (A/S/H items for this phase)
+     {phase_verification_plan}
 
      ## Expected Output
      Return structured JSON:
@@ -763,6 +971,30 @@ result = Task(subagent_type="mpl-phase-runner", model="sonnet",
      State Summary recommended additional sections: "수정된 것", "Discovery 처리 결과", "다음 phase를 위한 참고"
      """)
 ```
+
+### 4.2.1: Test Agent (Independent Verification)
+
+After Phase Runner completes with status `"complete"`, dispatch the Test Agent for independent verification:
+
+```
+test_result = Task(subagent_type="mpl-test-agent", model="sonnet",
+     prompt="""
+     ## Phase: {phase_id} - {phase_name}
+     ### Verification Plan (A/S-items for this phase)
+     {phase_verification_plan}
+     ### Interface Contract
+     {phase_definition.interface_contract}
+     ### Implemented Code
+     {list of files created/modified by the Phase Runner}
+
+     Write and run tests for this phase's implementation.
+     """)
+```
+
+Merge test_result into Phase Runner's verification data:
+- Update pass_rate with Test Agent's independent results
+- Record any bugs_found for potential fix cycle
+- If Test Agent pass_rate < Phase Runner's pass_rate: flag discrepancy
 
 ### 4.3: Result Processing
 
@@ -794,7 +1026,7 @@ result = Task(subagent_type="mpl-phase-runner", model="sonnet",
    }
 9. Report: "[MPL] Phase N/total 완료: {name}. Pass rate: {pass_rate}%. Micro-fixes: {micro_fixes}. PD {count}건."
 10. More phases -> current_phase = "mpl-phase-running", continue 4.1
-11. All done -> proceed to Step 4.5 (Final Verification Gate)
+11. All done -> proceed to Step 4.5 (3-Gate Quality)
 ```
 
 **On `"circuit_break"`**:
@@ -804,6 +1036,51 @@ result = Task(subagent_type="mpl-phase-runner", model="sonnet",
 2. Update pipeline state: current_phase = "mpl-circuit-break"
 3. Proceed to Redecomposition (4.4)
 ```
+
+### 4.3.5: Side Interview (Conditional)
+
+After processing phase results, check if a Side Interview is needed before the next phase.
+
+Trigger conditions (ANY triggers the interview):
+1. Phase reported a CRITICAL discovery
+2. Phase has 1+ H-items in verification_plan (human confirmation required)
+3. AD (After Decision) marker was created in this phase
+
+If NO triggers -> skip Side Interview, proceed to next phase.
+
+If triggered:
+
+```
+interview_role = determine_role(triggers):
+  - CRITICAL discovery -> "Issue Resolution": present discovery and ask for resolution
+  - H-items present -> "H-items Verification": present H-items for human judgment
+  - AD marker -> "AD Sufficiency Check": confirm AD interface definition is adequate
+
+AskUserQuestion based on interview_role:
+  - Issue Resolution: "Phase {N}에서 CRITICAL discovery가 발생했습니다: {description}. 어떻게 처리할까요?"
+    Options: "수용" | "반려" | "수정 후 계속"
+  - H-items: "Phase {N}의 H-items를 확인해주세요: {h_items_list}"
+    Options: "모두 확인됨" | "문제 있음 (수정 필요)"
+  - AD Sufficiency: "AD-{N}의 인터페이스 정의가 충분한가요? {ad_details}"
+    Options: "충분함" | "보완 필요"
+
+Record Side Interview results in `.mpl/mpl/phases/phase-N/side-interview.md`
+Report: "[MPL] Side Interview (Phase {N}): {role}. Result: {outcome}."
+```
+
+### 4.3.6: Orchestrator Context Cleanup
+
+After each phase completes, manage orchestrator context to prevent accumulation:
+
+1. Ensure state_summary is saved to `.mpl/mpl/phases/phase-N/state-summary.md` (already done in 4.3)
+2. Release detailed phase data from orchestrator working memory
+3. For next phase, load only:
+   - Previous phase summary (from file)
+   - Dependency summaries (from files, per interface_contract.requires)
+   - Updated phase-decisions.md
+   - Current phase definition
+
+This ensures each phase starts with a bounded context regardless of total phase count.
 
 ### 4.4: Redecomposition (on circuit break)
 
@@ -850,67 +1127,101 @@ else:
   5. Resume from first new phase (back to 4.1)
 ```
 
-### 4.5: Final Verification Gate (Phase 5 Entry Decision)
+### 4.5: 3-Gate Quality
 
-After all phases complete, evaluate whether additional fixing is needed:
+After all phases complete, apply the 3-Gate Quality system before finalization.
+
+#### Gate 1: Automated Tests
+
+Run the full test suite:
+- Execute all test commands (pytest, npm test, etc.)
+- pass_rate must be >= 95% to proceed to Gate 2
+- If pass_rate < 95%: enter fix loop (see 4.6)
+
+#### Gate 2: Code Review
 
 ```
-final_pass_rate = cumulative_pass_rate from last completed phase
+Task(subagent_type="mpl-code-reviewer", model="sonnet",
+     prompt="""
+     ## Review Scope
+     All files changed during pipeline execution.
+     ### Pivot Points
+     {pivot_points}
+     ### Interface Contracts
+     {all phase interface_contracts}
+     ### Changed Files
+     {list all created/modified files across all phases}
 
-if final_pass_rate == 100%:
-  → Skip Phase 5. Proceed directly to Step 5 (Finalize).
-  → Report: "[MPL] All tests pass (100%). Phase 5 skipped."
-
-elif final_pass_rate >= 95%:
-  → Minimal targeted fix: identify failing tests, dispatch single fix cycle
-  → Run targeted fix via mpl-worker (1 attempt only)
-  → Re-run full test suite
-  → Proceed to Step 5 regardless of outcome (document remaining failures)
-  → Report: "[MPL] Pass rate {rate}%. Minimal fix applied. Proceeding to finalize."
-
-elif final_pass_rate >= 80%:
-  → Phase 5 lightweight fix (1 cycle):
-    1. Analyze all failing tests
-    2. Group by root cause
-    3. Dispatch fix per root cause to mpl-worker
-    4. Re-run full test suite
-    5. If pass_rate >= 95% → Finalize
-    6. If pass_rate < 95% → Log remaining failures, Finalize anyway
-  → Report: "[MPL] Pass rate {rate}%. Phase 5 fix cycle executed."
-
-elif final_pass_rate < 80%:
-  → Abnormal state: Phase 0 artifacts may be insufficient
-  → Report: "[MPL] WARNING: Pass rate {rate}% < 80%. Phase 0 review recommended."
-  → AskUserQuestion: "통과율이 80% 미만입니다. 어떻게 진행할까요?"
-    Options:
-      1. "Phase 0 재실행" → Re-run Step 2.5 with deeper analysis, then redecompose
-      2. "수동 수정 후 계속" → Pause for user intervention
-      3. "현재 상태로 완료" → Finalize with documented failures
+     Review all changes for the Quality Gate.
+     """)
 ```
 
-Phase 5 Gate Metrics:
+Verdict handling:
+- PASS -> proceed to Gate 3
+- NEEDS_FIXES -> enter fix loop with prioritized fix list (see 4.6)
+- REJECT -> report to user, enter mpl-failed state
 
-| Pass Rate | Action | Expected Outcome |
-|-----------|--------|-----------------|
-| 100% | Skip Phase 5 | Instant finalize |
-| 95~99% | Targeted fix (1 attempt) | Quick fix + finalize |
-| 80~94% | Lightweight fix cycle | 1 fix round + finalize |
-| <80% | User decision required | Phase 0 review or manual fix |
+#### Gate 3: Agent-as-User
 
-Save gate decision to `.mpl/mpl/phase5-gate.json`:
-```json
-{
-  "final_pass_rate": 97,
-  "gate_decision": "targeted_fix",
-  "fix_applied": true,
-  "post_fix_pass_rate": 100,
-  "phase5_skipped": false
-}
+Final validation from user perspective using S-items from verification plan:
+- Execute all S-item BDD scenarios
+- Verify overall system behavior matches original intent
+- Check PP compliance holistically
+
+Gate 3 pass criteria: all S-items pass + no PP violations detected.
+
+If Gate 3 fails -> enter fix loop (see 4.6).
+
+All 3 gates pass -> proceed to Step 5 (E2E & Finalize).
+Report: `[MPL] 3-Gate Quality: Gate 1 {pass_rate}%, Gate 2 {verdict}, Gate 3 {pass/fail}.`
+
+### 4.6: Fix Loop (with Convergence Detection)
+
+When any gate fails, enter the fix loop:
+
+1. Analyze failure: which gate failed, what specifically failed
+2. Dispatch targeted fixes via mpl-worker
+3. Re-run the failed gate + all subsequent gates
+4. Track pass_rate in convergence history
+
+Convergence detection after each fix attempt:
+
 ```
+push pass_rate to convergence.pass_rate_history
+convergence_result = checkConvergence(state)
+
+if convergence_result.status == "stagnating":
+  -> Change strategy: provide different fix approach hints to worker
+  -> If still stagnating after strategy change: circuit break
+
+if convergence_result.status == "regressing":
+  -> Immediate circuit break
+  -> Report: "[MPL] Fix loop regression detected. Reverting to last good state."
+
+Record convergence_status in state: "progressing" | "stagnating" | "regressing"
+```
+
+Max fix loop iterations: controlled by max_fix_loops from config (default 10).
+Exceeding max -> mpl-failed state.
 
 ---
 
-## Step 5: Finalize
+## Step 5: E2E & Finalize
+
+### 5.0: E2E Test (Final)
+
+After 3-Gate Quality passes, run final E2E validation:
+- Execute Verification Planner's S-items designated as E2E scenarios
+- If Docker available: run in container. Otherwise: local E2E.
+- Execute remaining H-items via final Side Interview (if any unconsumed H-items remain)
+- Report: `[MPL] E2E Test: {passed}/{total} scenarios passed.`
+
+### 5.0.5: AD Final Verification
+
+Before knowledge extraction, verify all AD (After Decision) markers:
+- Check each AD has: interface definition + minimal implementation
+- Incomplete ADs: report to user (awareness, not blocking)
+- Report: `[MPL] AD Verification: {complete}/{total} ADs verified.`
 
 ### 5.1: Final Verification
 
@@ -959,7 +1270,19 @@ Save to `.mpl/mpl/metrics.json`:
     "finalize": 2000,
     "total_estimated": 49500
   },
-  "elapsed_ms": 720000, "final_verification": "all_pass"
+  "elapsed_ms": 720000, "final_verification": "all_pass",
+  "side_interviews": { "count": 0, "phases": [] },
+  "convergence_triggers": { "stagnation": 0, "regression": 0 },
+  "gap_analysis": { "missing_requirements": 0, "pitfalls": 0, "constraints": 0 },
+  "tradeoff_analysis": { "aggregate_risk": "LOW", "irreversible_count": 0 },
+  "critic_assessment": "READY",
+  "three_gate_results": {
+    "gate1_pass_rate": 100,
+    "gate2_verdict": "PASS",
+    "gate3_pass": true
+  },
+  "verification_plan": { "a_items": 0, "s_items": 0, "h_items": 0 },
+  "triage": { "interview_depth": "full", "prompt_density": 3 }
 }
 ```
 
@@ -1081,3 +1404,5 @@ for each discovery in result.discoveries:
 | `/mpl:mpl-compound` | Learning extraction |
 | `/mpl:mpl-doctor` | Installation diagnostics |
 | `/mpl:mpl-setup` | Setup wizard |
+| `/mpl:mpl-gap-analysis` | Gap analysis for missing requirements |
+| `/mpl:mpl-tradeoff` | Risk assessment and execution ordering |

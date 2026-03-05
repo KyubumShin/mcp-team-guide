@@ -34,6 +34,11 @@ const VALIDATE_AGENTS = new Set([
   'mpl-verification-planner',
   'mpl-worker',
   'mpl-research-synthesizer',
+  'mpl-phase-runner',
+  'mpl-interviewer',
+  'mpl-critic',
+  'mpl-test-agent',
+  'mpl-code-reviewer',
 ]);
 
 // Expected output sections per agent
@@ -71,6 +76,36 @@ const EXPECTED_SECTIONS = {
     'Implementation Guidance',
     'Open Questions',
     'Sources',
+  ],
+  'mpl-phase-runner': [
+    'status',
+    'state_summary',
+    'verification',
+  ],
+  'mpl-interviewer': [
+    'PP-',
+    'Priority Order',
+    'Interview Metadata',
+  ],
+  'mpl-critic': [
+    'Risk Register',
+    'Design Drift Vectors',
+    'Cross-Phase Dependency Risks',
+    'Verification Coverage Gaps',
+    'Recommendations',
+    'Go/No-Go Assessment',
+  ],
+  'mpl-test-agent': [
+    'phase_id',
+    'test_files_created',
+    'test_results',
+    'a_item_coverage',
+  ],
+  'mpl-code-reviewer': [
+    'Overall Verdict',
+    'Findings',
+    'Category Summary',
+    'Verdict Rationale',
   ],
 };
 

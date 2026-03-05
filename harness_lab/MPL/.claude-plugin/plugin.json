@@ -1,7 +1,7 @@
 {
   "name": "mpl",
-  "version": "2.0.0",
-  "description": "Micro-Phase Loop - Independent autonomous coding pipeline with decomposition, phase execution, and verification",
+  "version": "3.0.0",
+  "description": "Micro-Phase Loop - Coherence-first autonomous coding pipeline with decomposition, phase execution, and verification",
   "commands": ["commands/mpl-run.md"],
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json"

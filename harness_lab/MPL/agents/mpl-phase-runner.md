@@ -30,6 +30,7 @@ disallowedTools: []
     - Do not modify .mpl/state.json (orchestrator manages pipeline state).
     - Max 3 retries on verification failure in the same session. After 3 failures, report circuit_break.
     - PD Override: if you need to change a previous phase's decision, create an explicit PD Override request. Never silently change past decisions.
+    - Verification plan awareness: use the verification_plan's A/S/H classification to guide what and how to verify. H-items should be flagged, not skipped.
   </Constraints>
 
   <Execution_Flow>
@@ -39,6 +40,7 @@ disallowedTools: []
     - Layer 0 (pre-analysis): Read Phase 0 Enhanced artifacts from .mpl/mpl/phase0/ — pre-analyzed API contracts, examples, type policies, error specifications. Use these as ground truth for implementation decisions.
     - Layer 1 (immutable): Read pivot-points.md — no phase may violate a CONFIRMED PP
     - Layer 2 (accumulated): Read phase-decisions.md — all decisions made by prior phases
+    - Layer 2.5 (verification plan): Read verification_plan for this phase from context — A/S/H-items classification that determines what to verify and how
     - Layer 3 (this phase): Parse phase_definition — scope, impact, interface_contract, success_criteria, inherited_criteria
     - Layer 4 (actual state): Survey impact files listed in phase_definition.impact
 
@@ -70,6 +72,14 @@ disallowedTools: []
     - Max 2 immediate fix attempts per TODO before moving on (mark as needs-attention)
     - Fix should reference Phase 0 artifacts (especially error-spec and type-policy) for guidance
 
+    #### 3d. Test Agent Verification (after all TODOs complete)
+    After all worker TODOs are done (before Step 4 full verification), dispatch the Test Agent for independent testing:
+    - Provide: verification_plan A/S-items for this phase, interface_contract, list of changed files
+    - Test Agent writes and runs tests independently from the worker
+    - Collect test results and merge with worker acceptance criteria results
+    - If Test Agent finds bugs: add to fix queue for micro-cycle fixes
+    - Key principle: code author (worker) != test writer (test-agent)
+
     #### Micro-cycle failure policies:
 
     | Failure Type | Action | Max Retries | Phase 0 Reference |
@@ -96,6 +106,11 @@ disallowedTools: []
        - Record pass_rate = (passed_tests / total_tests) as percentage
        - This catches regressions that inherited_criteria alone might miss
     4. PP violation check: confirm implementation does not violate any CONFIRMED PP
+    5. A/S/H-items verification:
+       - A-items: execute command, check exit code (already covered by criteria above)
+       - S-items: verify BDD scenarios from Test Agent results
+       - H-items: flag for Side Interview (orchestrator handles human verification)
+       Record which H-items need human verification in the output.
 
     Record evidence for each criterion including pass_rate.
     A phase is NOT complete until ALL criteria pass AND pass_rate >= 95%.

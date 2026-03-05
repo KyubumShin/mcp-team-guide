@@ -235,7 +235,7 @@ describe('checkConvergence', () => {
         regression_threshold: -0.1
       }
     });
-    assert.strictEqual(result.status, 'stagnant');
+    assert.strictEqual(result.status, 'stagnating');
   });
 
   it('should detect regression', () => {
@@ -247,7 +247,7 @@ describe('checkConvergence', () => {
         regression_threshold: -0.1
       }
     });
-    assert.strictEqual(result.status, 'regression');
+    assert.strictEqual(result.status, 'regressing');
     assert.ok(result.delta < -0.1);
   });
 
