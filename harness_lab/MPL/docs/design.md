@@ -447,33 +447,33 @@ MPL은 4개의 훅으로 파이프라인 무결성을 유지한다:
 
 ### CRITICAL — 파이프라인 정합성에 영향
 
-| ID | 항목 | 상세 | 위치 |
-|----|------|------|------|
-| I-01 | 유령 에이전트 `mpl-research-synthesizer` | `VALIDATE_AGENTS` Set에 등록되어 있으나 에이전트 파일이 존재하지 않음. 해당 에이전트 출력 검증 시 불필요한 매칭이 발생하거나, 존재를 전제한 코드가 실패할 수 있음. 제거하거나 에이전트를 생성해야 한다. | `hooks/mpl-validate-output.mjs:36` |
-| I-02 | mpl-run.md Related Skills 표 중복 | `/mpl:mpl`이 "Full 5-Phase pipeline"과 "Micro-Phase Loop pipeline"으로 2회 등록되어 있어, 어느 프로토콜이 실행되는지 모호하다. | `commands/mpl-run.md:1396,1398` |
+| ID | 항목 | 상세 | 위치 | 상태 |
+|----|------|------|------|------|
+| I-01 | ~~유령 에이전트 `mpl-research-synthesizer`~~ | `VALIDATE_AGENTS` Set 및 `EXPECTED_SECTIONS`에서 제거 완료. | `hooks/mpl-validate-output.mjs` | **해결됨** (2026-03-05) |
+| I-02 | ~~mpl-run.md Related Skills 표 중복~~ | 중복된 `/mpl:mpl` 행 제거, 단일 등록으로 정리 완료. | `commands/mpl-run.md` | **해결됨** (2026-03-05) |
 
 ### HIGH — 기능 누락
 
-| ID | 항목 | 상세 | 위치 |
-|----|------|------|------|
-| I-03 | 스킬 `/mpl:mpl-bugfix` 미구현 | mpl-run.md Related Skills에 등록되었으나 `skills/mpl-bugfix/SKILL.md`가 존재하지 않음. | `commands/mpl-run.md:1403` |
-| I-04 | 스킬 `/mpl:mpl-small` 미구현 | mpl-run.md Related Skills에 등록되었으나 `skills/mpl-small/SKILL.md`가 존재하지 않음. | `commands/mpl-run.md:1397` |
-| I-05 | 스킬 `/mpl:mpl-compound` 래퍼 없음 | 에이전트(`agents/mpl-compound.md`)는 존재하지만 독립 실행을 위한 스킬 래퍼가 없음. | `commands/mpl-run.md:1404` |
-| I-06 | 스킬 `/mpl:mpl-gap-analysis` 래퍼 없음 | 에이전트(`agents/mpl-gap-analyzer.md`)는 존재하지만 독립 실행을 위한 스킬 래퍼가 없음. | `commands/mpl-run.md:1407` |
-| I-07 | `mpl-validate-output` 에이전트 목록 불완전 | `mpl-decomposer`, `mpl-git-master`가 `VALIDATE_AGENTS`에 없어 이 에이전트들의 출력은 검증 훅을 우회한다. | `hooks/mpl-validate-output.mjs:31-42` |
+| ID | 항목 | 상세 | 위치 | 상태 |
+|----|------|------|------|------|
+| I-03 | ~~스킬 `/mpl:mpl-bugfix` 미구현~~ | `skills/mpl-bugfix/SKILL.md` 생성 완료. 경량 버그 수정 파이프라인. | `skills/mpl-bugfix/SKILL.md` | **해결됨** (2026-03-05) |
+| I-04 | ~~스킬 `/mpl:mpl-small` 미구현~~ | `skills/mpl-small/SKILL.md` 생성 완료. 3-Phase 경량 파이프라인. | `skills/mpl-small/SKILL.md` | **해결됨** (2026-03-05) |
+| I-05 | ~~스킬 `/mpl:mpl-compound` 래퍼 없음~~ | `skills/mpl-compound/SKILL.md` 생성 완료. 학습 추출 독립 실행. | `skills/mpl-compound/SKILL.md` | **해결됨** (2026-03-05) |
+| I-06 | ~~스킬 `/mpl:mpl-gap-analysis` 래퍼 없음~~ | `skills/mpl-gap-analysis/SKILL.md` 생성 완료. 독립 갭 분석. | `skills/mpl-gap-analysis/SKILL.md` | **해결됨** (2026-03-05) |
+| I-07 | ~~`mpl-validate-output` 에이전트 목록 불완전~~ | `mpl-decomposer`, `mpl-git-master`, `mpl-compound`를 VALIDATE_AGENTS 및 EXPECTED_SECTIONS에 추가 완료. | `hooks/mpl-validate-output.mjs` | **해결됨** (2026-03-05) |
 
 ### MEDIUM — 미구현 로드맵 기능
 
-| ID | 항목 | 상세 | 현재 대안 |
-|----|------|------|----------|
-| I-08 | API 자동 추출 (AST 파서) | `TestAnalyzer` 클래스를 통한 테스트 파일 자동 파싱. 로드맵 Phase 3 P1 항목. | 오케스트레이터가 `ast_grep_search`/`lsp` 도구로 매 실행마다 수동 분석 |
-| I-09 | 패턴 자동 분석 (패턴 감지기) | 7개 패턴 카테고리를 자동 분류하는 감지기. 로드맵 Phase 3 P1 항목. | 오케스트레이터가 Grep/ast_grep으로 수동 추출 |
+| ID | 항목 | 상세 | 상태 |
+|----|------|------|------|
+| I-08 | ~~API 자동 추출 (AST 파서)~~ | `mpl-test-analyzer.mjs` 구현 완료. 함수 호출, pytest.raises, assert, fixture 추출. | **해결됨** (2026-03-05) |
+| I-09 | ~~패턴 자동 분석 (패턴 감지기)~~ | `mpl-pattern-detector.mjs` 구현 완료. 7개 카테고리 자동 분류. | **해결됨** (2026-03-05) |
 
 ### LOW — 개선 사항
 
-| ID | 항목 | 상세 | 위치 |
+| ID | 항목 | 상세 | 상태 |
 |----|------|------|------|
-| I-10 | Convergence 상태 명명 불일치 | 훅: `stagnant`/`regression` vs mpl-run.md: `stagnating`/`regressing`. 동작에는 영향 없으나 명명 불일치. | `hooks/mpl-phase-controller.mjs:286` vs `commands/mpl-run.md:1193-1198` |
-| I-11 | Phase 0 캐시 검증 코드 없음 | 캐싱 프로토콜은 mpl-run.md에 상세 기술되어 있으나, 캐시 키 생성/검증을 수행하는 유틸리티 코드가 없음. 오케스트레이터 프로토콜에 전적으로 의존. | `commands/mpl-run.md:303-345` |
-| I-12 | 토큰 프로파일링 집계 도구 없음 | `phases.jsonl`에 데이터를 기록하는 프로토콜은 있으나, 축적된 프로파일을 분석·시각화하는 도구(스킬 또는 유틸리티)가 없음. | `commands/mpl-run.md:646-675, 1289-1310` |
-| I-13 | Triage 로직 훅 미반영 | `interview_depth` 결정과 Phase 0 캐시 확인이 훅이 아닌 프로토콜 수준에서만 지시됨. 훅으로 강제하지 않으므로 오케스트레이터가 건너뛸 가능성 존재. | `commands/mpl-run.md:102-126` |
+| I-10 | ~~Convergence 상태 명명 불일치~~ | `stagnant` → `stagnating`, `regression` → `regressing`으로 통일 완료. | **해결됨** (2026-03-05) |
+| I-11 | ~~Phase 0 캐시 검증 코드 없음~~ | `mpl-cache.mjs` 구현 완료. 캐시 키 생성, 히트/미스 판정, 저장/읽기 유틸리티. | **해결됨** (2026-03-05) |
+| I-12 | ~~토큰 프로파일링 집계 도구 없음~~ | `mpl-profile.mjs` 구현 완료. JSONL 파싱, 집계 통계, 이상 탐지, 텍스트 리포트. | **해결됨** (2026-03-05) |
+| I-13 | ~~Triage 로직 훅 미반영~~ | `mpl-phase-controller.mjs`의 `phase2-sprint` 진입 시 `interview_depth` 가드 추가 완료. | **해결됨** (2026-03-05) |

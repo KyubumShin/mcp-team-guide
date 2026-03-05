@@ -219,7 +219,7 @@ export function checkConvergence(state) {
     }
 
     if (improvement < min_improvement) {
-      return { status: 'stagnant', delta: improvement, suggestion: 'Improvement is below threshold. Consider changing fix strategy.' };
+      return { status: 'stagnating', delta: improvement, suggestion: 'Improvement is below threshold. Consider changing fix strategy.' };
     }
   }
 

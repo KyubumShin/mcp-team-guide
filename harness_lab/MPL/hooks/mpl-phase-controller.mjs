@@ -188,6 +188,18 @@ async function main() {
     }
 
     case 'phase2-sprint': {
+      // Triage guard: ensure interview_depth was recorded before execution
+      if (!state.interview_depth) {
+        console.log(JSON.stringify({
+          continue: true,
+          hookSpecificOutput: {
+            hookEventName: 'Stop',
+            additionalContext: '[MPL] Triage guard: interview_depth not recorded in state. Run Triage (Step 0) to set interview_depth (skip/light/full) before proceeding to Sprint.'
+          }
+        }));
+        break;
+      }
+
       // Check PLAN.md completion
       const planStatus = checkPlanStatus(cwd);
       if (!planStatus || planStatus.total === 0) {
@@ -283,7 +295,7 @@ async function main() {
       } else {
         // H1: Check convergence before continuing
         const convergenceResult = checkConvergence(state);
-        if (convergenceResult.status === 'stagnant' || convergenceResult.status === 'regression') {
+        if (convergenceResult.status === 'stagnating' || convergenceResult.status === 'regressing') {
           writeState(cwd, { current_phase: 'phase5-finalize' });
           console.log(JSON.stringify({
             continue: true,

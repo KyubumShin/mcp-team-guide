@@ -61,12 +61,40 @@ Output a structured dashboard:
 ║  Fix Loop: {count}/{max}                         ║
 ║  Convergence: {improving|stagnating|regressing}  ║
 ║  Pass Rate History: {rates}                      ║
+╠══════════════════════════════════════════════════╣
+║  Token Profile:                                  ║
+║  Total Tokens: {total_tokens}                    ║
+║  Avg/Phase:    {avg_tokens_per_phase}            ║
+║  Duration:     {total_duration}s                 ║
+║  Micro-fixes:  {total_micro_fixes}               ║
+║  Retries:      {total_retries}                   ║
+║  Anomalies:    {anomaly_count}                   ║
+║  Cache:        {HIT|MISS}                        ║
 ╚══════════════════════════════════════════════════╝
 ```
 
-### Step 4: Phase-Specific Details
+### Step 4: Token Profile
 
-Based on current phase, add contextual information:
+Read `.mpl/mpl/profile/phases.jsonl` and `.mpl/mpl/profile/run-summary.json` to generate token usage metrics.
+
+The profile library (`MPL/hooks/lib/mpl-profile.mjs`) provides:
+- `analyzeProfile(cwd)` → `{ phases, totals, anomalies }`
+- `readRunSummary(cwd)` → run summary object or null
+- `formatReport(analysis, summary)` → formatted text report
+
+Display in the Token Profile dashboard section:
+- **Total Tokens**: sum across all phases
+- **Avg/Phase**: average tokens per phase
+- **Duration**: total execution time
+- **Micro-fixes / Retries**: aggregate counts
+- **Anomalies**: count of detected anomalies (token overuse >2x avg, excessive fixes ≥5, low pass rate <80%)
+- **Cache**: Phase 0 cache hit/miss status from run-summary
+
+If no profile data exists, show "No profile data available."
+
+### Step 5: Phase-Specific Details
+
+Based on the current phase, add contextual information:
 
 - **phase1a-research**: Show research mode (full/light/standalone), current stage, stages completed, degraded stages if any
 - **phase1b-plan**: Show research report path, key recommendation, agents launched for planning
@@ -76,7 +104,7 @@ Based on current phase, add contextual information:
 - **phase4-fix**: Show failure pattern, strategy being used, convergence trend
 - **phase5-finalize**: Show learnings extracted, commits made
 
-### Step 5: Recommendations
+### Step 6: Recommendations
 
 Based on state, suggest next action:
 

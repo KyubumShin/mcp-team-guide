@@ -6,6 +6,24 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
+/**
+ * Deep merge for config: nested objects are merged, arrays and primitives are replaced.
+ */
+function deepMergeConfig(target, source) {
+  const result = { ...target };
+  for (const key of Object.keys(source)) {
+    if (
+      source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) &&
+      target[key] && typeof target[key] === 'object' && !Array.isArray(target[key])
+    ) {
+      result[key] = deepMergeConfig(target[key], source[key]);
+    } else {
+      result[key] = source[key];
+    }
+  }
+  return result;
+}
+
 const DEFAULTS = {
   max_fix_loops: 10,
   max_total_tokens: 500000,
@@ -28,7 +46,7 @@ export function loadConfig(cwd) {
   if (!existsSync(configPath)) return { ...DEFAULTS };
   try {
     const userConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
-    return { ...DEFAULTS, ...userConfig };
+    return deepMergeConfig(DEFAULTS, userConfig);
   } catch {
     return { ...DEFAULTS };
   }

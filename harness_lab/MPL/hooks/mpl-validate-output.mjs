@@ -28,21 +28,23 @@ const { readStdin } = await import(
 );
 
 // Agents that require output validation
-const VALIDATE_AGENTS = new Set([
+export const VALIDATE_AGENTS = new Set([
   'mpl-gap-analyzer',
   'mpl-tradeoff-analyzer',
   'mpl-verification-planner',
   'mpl-worker',
-  'mpl-research-synthesizer',
   'mpl-phase-runner',
   'mpl-interviewer',
   'mpl-critic',
   'mpl-test-agent',
   'mpl-code-reviewer',
+  'mpl-decomposer',
+  'mpl-git-master',
+  'mpl-compound',
 ]);
 
 // Expected output sections per agent
-const EXPECTED_SECTIONS = {
+export const EXPECTED_SECTIONS = {
   'mpl-gap-analyzer': [
     '1. Missing Requirements',
     '2. AI Pitfalls',
@@ -67,15 +69,6 @@ const EXPECTED_SECTIONS = {
     'status',
     'outputs',
     'acceptance_criteria',
-  ],
-  'mpl-research-synthesizer': [
-    'Executive Summary',
-    'Option Comparison',
-    'Anti-Patterns & Risks',
-    'Recommendations',
-    'Implementation Guidance',
-    'Open Questions',
-    'Sources',
   ],
   'mpl-phase-runner': [
     'status',
@@ -107,7 +100,68 @@ const EXPECTED_SECTIONS = {
     'Category Summary',
     'Verdict Rationale',
   ],
+  'mpl-decomposer': [
+    'architecture_anchor',
+    'phases',
+  ],
+  'mpl-git-master': [
+    'Commits Created',
+  ],
+  'mpl-compound': [
+    'Learnings',
+    'Decisions',
+    'Issues',
+    'Metrics',
+  ],
 };
+
+/**
+ * Validate response text against expected sections (case-insensitive).
+ * @param {string[]} sections - Expected section names
+ * @param {string} responseText - Agent response text
+ * @returns {{ passed: boolean, missing: string[], found: string[], sectionList: string }}
+ */
+export function validateSections(sections, responseText) {
+  const missing = [];
+  const found = [];
+  const lower = responseText.toLowerCase();
+  for (const section of sections) {
+    if (lower.includes(section.toLowerCase())) {
+      found.push(section);
+    } else {
+      missing.push(section);
+    }
+  }
+  const sectionList = sections.map(s => {
+    const ok = found.includes(s);
+    return `  - ${ok ? '[PASS]' : '[MISSING]'} ${s}`;
+  }).join('\n');
+  return { passed: missing.length === 0, missing, found, sectionList };
+}
+
+/**
+ * Format validation result into a hook message string.
+ * @param {string} agentType
+ * @param {string[]} sections
+ * @param {boolean} passed
+ * @param {string[]} missing
+ * @param {string} sectionList
+ * @returns {string}
+ */
+export function formatValidationMessage(agentType, sections, passed, missing, sectionList) {
+  if (passed) {
+    return `[MPL VALIDATION PASSED] Agent "${agentType}" output contains all ${sections.length} required sections.`;
+  }
+  return `[VALIDATION FAILED] [MPL VALIDATION FAILED] Agent "${agentType}" output is missing ${missing.length}/${sections.length} required sections.
+
+Validation results:
+${sectionList}
+
+Missing sections: ${missing.join(', ')}
+
+ACTION REQUIRED: Re-run the agent with clarified instructions targeting the missing sections.
+Do NOT proceed to the next phase until all sections are present.`;
+}
 
 async function main() {
   const input = await readStdin();
@@ -154,22 +208,7 @@ async function main() {
     ? toolResponse
     : JSON.stringify(toolResponse);
 
-  const missingSections = [];
-  const foundSections = [];
-  for (const section of sections) {
-    // Case-insensitive search for section name in response
-    if (responseText.toLowerCase().includes(section.toLowerCase())) {
-      foundSections.push(section);
-    } else {
-      missingSections.push(section);
-    }
-  }
-
-  const validationPassed = missingSections.length === 0;
-  const sectionList = sections.map(s => {
-    const found = foundSections.includes(s);
-    return `  - ${found ? '[PASS]' : '[MISSING]'} ${s}`;
-  }).join('\n');
+  const { passed, missing, found, sectionList } = validateSections(sections, responseText);
 
   // H2: Estimate token usage from response length and update state
   try {
@@ -185,25 +224,11 @@ async function main() {
     // Token tracking is best-effort; do not block on failure
   }
 
-  let message;
-  if (validationPassed) {
-    message = `[MPL VALIDATION PASSED] Agent "${agentType}" output contains all ${sections.length} required sections.`;
-  } else {
-    // C3: Prefix with [VALIDATION FAILED] for unmistakable signal
-    message = `[VALIDATION FAILED] [MPL VALIDATION FAILED] Agent "${agentType}" output is missing ${missingSections.length}/${sections.length} required sections.
-
-Validation results:
-${sectionList}
-
-Missing sections: ${missingSections.join(', ')}
-
-ACTION REQUIRED: Re-run the agent with clarified instructions targeting the missing sections.
-Do NOT proceed to the next phase until all sections are present.`;
-  }
+  const message = formatValidationMessage(agentType, sections, passed, missing, sectionList);
 
   // C3: Block (continue: false) when validation fails
   console.log(JSON.stringify({
-    continue: validationPassed,
+    continue: passed,
     hookSpecificOutput: {
       hookEventName: 'PostToolUse',
       additionalContext: message

@@ -136,38 +136,38 @@ v1.0 (기존)                          v3.0 (달성)
 
 > 최종 감사일: 2026-03-05. 전체 목록은 [design.md §9](../design.md#9-알려진-이슈-및-잔여-작업)를 참조한다.
 
-### CRITICAL (2건) — 정합성 영향
+### ~~CRITICAL (2건) — 정합성 영향~~ **해결됨** (2026-03-05)
 
-| ID | 항목 | 상세 |
+| ID | 항목 | 상태 |
 |----|------|------|
-| I-01 | 유령 에이전트 `mpl-research-synthesizer` | `mpl-validate-output.mjs`의 VALIDATE_AGENTS에 등록되었으나 에이전트 파일 없음. 제거 또는 생성 필요. |
-| I-02 | mpl-run.md Related Skills 중복 | `/mpl:mpl`이 2회 등록되어 실행 프로토콜이 모호함. |
+| I-01 | ~~유령 에이전트 `mpl-research-synthesizer`~~ | **해결됨** — VALIDATE_AGENTS 및 EXPECTED_SECTIONS에서 제거 |
+| I-02 | ~~mpl-run.md Related Skills 중복~~ | **해결됨** — 중복 행 제거, 단일 등록으로 정리 |
 
-### HIGH (5건) — 기능 누락
+### ~~HIGH (5건) — 기능 누락~~ **해결됨** (2026-03-05)
 
-| ID | 항목 | 상세 |
+| ID | 항목 | 상태 |
 |----|------|------|
-| I-03 | 스킬 `/mpl:mpl-bugfix` 미구현 | mpl-run.md에 등록되었으나 SKILL.md 없음 |
-| I-04 | 스킬 `/mpl:mpl-small` 미구현 | mpl-run.md에 등록되었으나 SKILL.md 없음 |
-| I-05 | 스킬 `/mpl:mpl-compound` 래퍼 없음 | 에이전트는 존재, 독립 스킬 없음 |
-| I-06 | 스킬 `/mpl:mpl-gap-analysis` 래퍼 없음 | 에이전트는 존재, 독립 스킬 없음 |
-| I-07 | `mpl-validate-output` 에이전트 목록 불완전 | `mpl-decomposer`, `mpl-git-master` 출력이 검증 우회 |
+| I-03 | ~~스킬 `/mpl:mpl-bugfix` 미구현~~ | **해결됨** — `skills/mpl-bugfix/SKILL.md` 생성 |
+| I-04 | ~~스킬 `/mpl:mpl-small` 미구현~~ | **해결됨** — `skills/mpl-small/SKILL.md` 생성 |
+| I-05 | ~~스킬 `/mpl:mpl-compound` 래퍼 없음~~ | **해결됨** — `skills/mpl-compound/SKILL.md` 생성 |
+| I-06 | ~~스킬 `/mpl:mpl-gap-analysis` 래퍼 없음~~ | **해결됨** — `skills/mpl-gap-analysis/SKILL.md` 생성 |
+| I-07 | ~~`mpl-validate-output` 에이전트 목록 불완전~~ | **해결됨** — `mpl-decomposer`, `mpl-git-master`, `mpl-compound` 추가 |
 
-### MEDIUM (2건) — 미구현 로드맵
+### ~~MEDIUM (2건) — 미구현 로드맵~~ **해결됨** (2026-03-05)
 
-| ID | 항목 | 현재 대안 |
-|----|------|----------|
-| I-08 | API 자동 추출 (AST 파서) — `TestAnalyzer` 클래스 | 오케스트레이터가 ast_grep_search/lsp로 수동 분석 |
-| I-09 | 패턴 자동 분석 (패턴 감지기) — 7개 카테고리 자동 분류 | 오케스트레이터가 Grep/ast_grep으로 수동 추출 |
+| ID | 항목 | 상태 |
+|----|------|------|
+| I-08 | ~~API 자동 추출 (AST 파서)~~ | **해결됨** — `hooks/lib/mpl-test-analyzer.mjs` 구현 |
+| I-09 | ~~패턴 자동 분석 (패턴 감지기)~~ | **해결됨** — `hooks/lib/mpl-pattern-detector.mjs` 구현 |
 
-### LOW (4건) — 개선 사항
+### ~~LOW (4건) — 개선 사항~~ **해결됨** (2026-03-05)
 
-| ID | 항목 |
-|----|------|
-| I-10 | Convergence 상태 명명 불일치 (훅 `stagnant` vs 프로토콜 `stagnating`) |
-| I-11 | Phase 0 캐시 검증 유틸리티 코드 없음 (프로토콜 의존) |
-| I-12 | 토큰 프로파일링 집계·시각화 도구 없음 |
-| I-13 | Triage 로직이 훅으로 강제되지 않음 (프로토콜 수준만) |
+| ID | 항목 | 상태 |
+|----|------|------|
+| I-10 | ~~Convergence 상태 명명 불일치~~ | **해결됨** — `stagnating`/`regressing`으로 통일 |
+| I-11 | ~~Phase 0 캐시 검증 유틸리티 코드 없음~~ | **해결됨** — `hooks/lib/mpl-cache.mjs` 구현 |
+| I-12 | ~~토큰 프로파일링 집계·시각화 도구 없음~~ | **해결됨** — `hooks/lib/mpl-profile.mjs` 구현 |
+| I-13 | ~~Triage 로직이 훅으로 강제되지 않음~~ | **해결됨** — phase-controller에 triage 가드 추가 |
 
 ---
 

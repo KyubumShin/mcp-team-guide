@@ -69,21 +69,30 @@ mpl-init -> mpl-decompose -> mpl-phase-running <-> mpl-phase-complete
 
 ## IMPORTANT: Load Detailed Protocol
 
-This SKILL.md is the activation summary. For **Phase-by-Phase execution instructions** (agent calls, context assembly, PD 3-Tier classification, impact file loading, circuit breaker logic, resume protocol), you MUST read the full orchestration protocol:
+This SKILL.md is the activation summary. The orchestration protocol is split into focused files to save context tokens (~60-70% reduction).
 
+**Step 1**: Always read the router first:
 ```
-Read the command file: MPL/commands/mpl-run.md
+Read: MPL/commands/mpl-run.md
 ```
 
-Do NOT proceed with Phase execution without loading the detailed protocol first.
+**Step 2**: Then read the protocol file matching the current stage:
+
+| Stage | Read |
+|-------|------|
+| Pre-Execution (Steps 0~2.5) | `MPL/commands/mpl-run-phase0.md` |
+| Decomposition (Steps 3~3-C) | `MPL/commands/mpl-run-decompose.md` |
+| Execution (Step 4) | `MPL/commands/mpl-run-execute.md` |
+| Finalize / Resume (Steps 5~6) | `MPL/commands/mpl-run-finalize.md` |
+
+Do NOT proceed with Phase execution without loading the corresponding protocol file first.
 
 ## Related Skills
 
 | Skill | Purpose |
 |-------|---------|
-| `/mpl:mpl` | Full 5-Phase pipeline (standard mode) |
+| `/mpl:mpl` | Full MPL pipeline — Micro-Phase Loop (this skill) |
 | `/mpl:mpl-small` | 3-Phase lightweight pipeline (1-5 files, clear scope) |
-| `/mpl:mpl` | Micro-Phase Loop pipeline (this skill) |
 | `/mpl:mpl-pivot` | Pivot Points interview (immutable constraints) |
 | `/mpl:mpl-research` | Standalone deep research (independent of pipeline) |
 | `/mpl:mpl-status` | Pipeline status dashboard |
