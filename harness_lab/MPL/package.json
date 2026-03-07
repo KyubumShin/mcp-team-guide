@@ -1,8 +1,0 @@
-{
-  "name": "mpl-hooks",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --test hooks/__tests__/*.test.mjs"
-  }
-}
