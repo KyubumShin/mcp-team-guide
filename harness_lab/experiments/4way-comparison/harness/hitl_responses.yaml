@@ -1,0 +1,45 @@
+# 4-System A/B Comparison: Scripted HITL Responses
+# All systems receive identical pre-defined responses for controlled comparison.
+
+# --- UAM/hoyeon Plan Approval ---
+plan_approval:
+  default: "proceed"
+  timeout_seconds: 30  # auto-approve if no input within 30s
+
+# --- UAM Pivot Point Interview ---
+pivot_points:
+  tech_stack: "FastAPI + SQLite + JWT as specified"
+  external_deps: "Only packages listed in pyproject.toml"
+  api_style: "REST only, no GraphQL"
+  db_choice: "SQLite with aiosqlite as specified"
+  auth_method: "JWT with PyJWT as specified"
+
+# --- UAM Fix Loop ---
+fix_loop:
+  default: "continue"
+  max_iterations: 5
+
+# --- hoyeon /specify Interview ---
+specify_interview:
+  scope: "All 6 features as described in prompt"
+  priority: "Auth first, then CRUD, then Bookshelf management, then Search"
+  risk_tolerance: "standard"
+  architecture: "Single module FastAPI app"
+  testing: "pytest with httpx async client"
+
+# --- UAM-MPL Discovery Handling ---
+discovery:
+  pp_conflict: "reject"    # Always reject PP violations
+  pd_override: "approve"   # Always approve PD modifications
+  replan_approval: "approve"
+
+# --- OMC ---
+omc:
+  mode: "autopilot"  # Full autonomous, no HITL needed
+  note: "OMC autopilot runs autonomously. Architect verification remains active."
+
+# --- Generic Approval ---
+generic:
+  continue_or_stop: "continue"
+  approve_or_reject: "approve"
+  yes_or_no: "yes"
