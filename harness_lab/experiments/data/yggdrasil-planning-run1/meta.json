@@ -1,0 +1,46 @@
+{
+  "experiment": "exp_planning_compaction_impact",
+  "run_id": "yggdrasil-planning-run1",
+  "date": "2026-03-12",
+  "model": "sonnet",
+  "project": "yggdrasil-compaction-experiment",
+  "project_scale": {
+    "spec_files": 5,
+    "spec_lines": 3297,
+    "type_files": 6,
+    "test_files": 8,
+    "test_count": 77,
+    "source_stubs": 14,
+    "analysis_docs_generated": 5,
+    "analysis_docs_total_bytes": 138011
+  },
+  "rounds": [
+    { "round": 1, "prompt": "전체 spec 읽기 + 초기 계획", "ctx_after": null, "compaction": false, "output_to": "file" },
+    { "round": 2, "prompt": "type 정의 분석 + 계획 보완", "ctx_after": null, "compaction": false, "output_to": "file" },
+    { "round": 3, "prompt": "테스트 분석 + 수용 기준 매핑", "ctx_after": null, "compaction": false, "output_to": "file" },
+    { "round": 4, "prompt": "의존관계 그래프 + 구현 순서", "ctx_after": "77%", "compaction": false, "output_to": "file" },
+    { "round": 5, "prompt": "리스크 평가 + 에지케이스", "ctx_after": "83%+", "compaction": true, "compaction_number": 1, "output_to": "file" },
+    { "round": "5-probe", "prompt": "정보 보존 테스트 (DB 테이블 누락)", "result": "정확", "info_preserved": true },
+    { "round": "5-probe2", "prompt": "정보 보존 테스트 (파일 줄 수 + MVP 불일치)", "result": "정확", "info_preserved": true },
+    { "round": 6, "prompt": "Zustand store 심층 분석", "ctx_after": "21%→51%", "compaction": true, "compaction_number": 2, "output_to": "terminal" },
+    { "round": 7, "prompt": "최종 구현 계획 종합", "ctx_after": "51%→59%", "compaction": false, "output_to": "file" },
+    { "round": 8, "prompt": "Tauri command 인터페이스 분석", "ctx_after": "59%→71%", "compaction": false, "output_to": "terminal" },
+    { "round": 9, "prompt": "frontend component 분석", "ctx_after": "71%", "compaction": true, "compaction_number": 3, "output_to": "terminal" },
+    { "round": 10, "prompt": "전체 비판적 검토 (10개 파일 읽기)", "ctx_after": "77%", "compaction_failed": true, "compaction_number": 4, "error": "auto compact failed - conversation too long" }
+  ],
+  "compaction_summary": {
+    "total_compactions": 4,
+    "compaction_1": { "trigger_round": 5, "ctx_before": "~83%", "ctx_after": "unknown", "info_loss": "none (file externalization)" },
+    "compaction_2": { "trigger_round": 6, "ctx_before": "~83%", "ctx_after": "21%", "info_loss": "minimal" },
+    "compaction_3": { "trigger_round": 9, "ctx_before": "~83%", "ctx_after": "unknown" },
+    "compaction_4_failed": { "trigger_round": 10, "ctx_at_failure": "77%", "error": "auto compact mechanism itself failed" }
+  },
+  "findings": [
+    "Planning conversations are the primary compaction trigger, not code implementation",
+    "File externalization (Write to .md) acts as compaction resilience - info survives compaction",
+    "Terminal-only output (no file write) fills context faster",
+    "Compaction failure ceiling exists - after ~4 compactions, auto compact mechanism breaks",
+    "Post-compaction info preservation is high when analysis results are externalized to files",
+    "77% context usage with 4 prior compactions causes compaction mechanism failure"
+  ]
+}

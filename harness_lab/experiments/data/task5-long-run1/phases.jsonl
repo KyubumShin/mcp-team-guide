@@ -1,0 +1,4 @@
+{"step":"phase1a-research","name":"mpl:mpl-worker","pass_rate":null,"micro_fixes":0,"estimated_tokens":{"context":0,"output":617,"total":617},"compaction_count":0,"timestamp":"2026-03-11T13:28:30.159Z"}
+{"step":"phase1a-research","name":"mpl:mpl-worker","pass_rate":null,"micro_fixes":0,"estimated_tokens":{"context":0,"output":983,"total":983},"compaction_count":0,"timestamp":"2026-03-11T13:28:40.175Z"}
+{"step":"phase1a-research","name":"mpl:mpl-worker","pass_rate":null,"micro_fixes":0,"estimated_tokens":{"context":0,"output":1026,"total":1026},"compaction_count":0,"timestamp":"2026-03-11T13:28:44.262Z"}
+{"step":"phase1a-research","name":"mpl:mpl-worker","pass_rate":null,"micro_fixes":0,"estimated_tokens":{"context":0,"output":1256,"total":1256},"compaction_count":0,"timestamp":"2026-03-11T13:28:55.384Z"}

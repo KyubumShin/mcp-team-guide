@@ -1,0 +1,50 @@
+{
+  "pipeline_id": "mpl-20260311-task5-long-run1",
+  "run_mode": "auto",
+  "tool_mode": "full",
+  "pipeline_tier": null,
+  "pipeline_score": null,
+  "tier_hint": null,
+  "escalation_history": [],
+  "interview_depth": null,
+  "current_phase": "phase1a-research",
+  "started_at": null,
+  "finalize_done": false,
+  "sprint_status": {
+    "total_todos": 0,
+    "completed_todos": 0,
+    "in_progress_todos": 0,
+    "failed_todos": 0
+  },
+  "gate_results": {
+    "gate1_passed": null,
+    "gate2_passed": null,
+    "gate3_passed": null
+  },
+  "fix_loop_count": 0,
+  "max_fix_loops": 10,
+  "compaction_count": 0,
+  "cost": {
+    "total_tokens": 3882,
+    "max_total_tokens": 500000,
+    "estimated_usd": 0
+  },
+  "convergence": {
+    "pass_rate_history": [],
+    "stagnation_window": 3,
+    "min_improvement": 0.05,
+    "regression_threshold": -0.1
+  },
+  "research": {
+    "status": null,
+    "started_at": null,
+    "completed_at": null,
+    "stages_completed": [],
+    "report_path": null,
+    "findings_count": 0,
+    "sources_count": 0,
+    "mode": "full",
+    "error": null,
+    "degraded_stages": []
+  }
+}

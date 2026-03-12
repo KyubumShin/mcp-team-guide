@@ -1,0 +1,18 @@
+{
+  "task_id": 5,
+  "task_name": "full-integration",
+  "condition": "long",
+  "run_number": 1,
+  "model": "claude-sonnet-4-6",
+  "date": "2026-03-11",
+  "final_pass_rate": 1.0,
+  "total_tests": 81,
+  "passed_tests": 81,
+  "compaction_count": 0,
+  "fix_loop_count": 0,
+  "session_resets": 0,
+  "worker_calls": 4,
+  "context_usage_pct": 21,
+  "estimated_tokens": 3882,
+  "notes": "4 parallel workers (queue, scheduler, persistence, hooks). All 81 tests passed first try. Context only 21% - no compaction triggered. Subagent delegation prevents context accumulation in orchestrator."
+}
